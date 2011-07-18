@@ -36,7 +36,8 @@ let parmap f l ?(ncores=1) =
 	begin
 	  closer();
           let reschunk=ref [] in
-          for j=i*chunksize to (i+1)*chunksize-1 do
+          let limit=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
+          for j=i*chunksize to limit do
 	    try 
               reschunk := (f (List.nth l j))::!reschunk
 	    with _ -> (Printf.printf "Error: j=%d\n" j)
@@ -64,4 +65,4 @@ let parmap f l ?(ncores=1) =
 ;;
 
 
-List.map (fun n -> Printf.printf "%d\n" n) (parmap (fun x -> x+1) [1;2;3;4;5;6;7;8;9;10;11;12] ~ncores:4);;
+List.map (fun n -> Printf.printf "%d\n" n) (parmap (fun x -> x+1) [1;2;3;4;5;6;7;8;9;10;11;12;13] ~ncores:4);;
