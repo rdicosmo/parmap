@@ -12,8 +12,8 @@
 (**************************************************************************)
 
 let mkpipe () =
-    let (ofd,ifd) = Unix.pipe () in
-    ((fun x -> Marshal.to_channel (Unix.out_channel_of_descr ofd) x [Marshal.Closures]), 
+    let (ifd,ofd) = Unix.pipe () in
+    ((fun x -> let s = Marshal.to_string x [Marshal.Closures] in Unix.write ofd s 0 (String.length s)), 
      (fun () -> Marshal.from_channel (Unix.in_channel_of_descr ifd)),
      (fun () -> Printf.printf "Closing out (I am %d)\n" (Unix.getpid()); Unix.close ofd),
      (fun () -> Printf.printf "Closing in (I am %d)\n" (Unix.getpid()); Unix.close ifd)
@@ -63,4 +63,4 @@ let parmap f l ?(ncores=1) =
 ;;
 
 
-List.map (fun n -> Printf.printf "%d\n" n) (parmap (fun x -> x+1) [1;2;3;4;5;6;7;8;9;10;11;12] ~ncores:1);;
+List.map (fun n -> Printf.printf "%d\n" n) (parmap (fun x -> x+1) [1;2;3;4;5;6;7;8;9;10;11;12] ~ncores:4);;
