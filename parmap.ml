@@ -13,10 +13,11 @@
 
 let mkpipe () =
     let (ifd,ofd) = Unix.pipe () in
-    ((fun x -> let s = Marshal.to_string x [Marshal.Closures] in Unix.write ofd s 0 (String.length s)), 
-     (fun () -> Marshal.from_channel (Unix.in_channel_of_descr ifd)),
-     (fun () -> Printf.printf "Closing out (I am %d)\n" (Unix.getpid()); Unix.close ofd),
-     (fun () -> Printf.printf "Closing in (I am %d)\n" (Unix.getpid()); Unix.close ifd)
+    let (ic, oc) = (Unix.in_channel_of_descr ifd, Unix.out_channel_of_descr ofd) in
+    ((fun x ->  Marshal.to_channel oc x [Marshal.Closures]),
+     (fun () -> Marshal.from_channel ic),
+     (fun () -> Printf.printf "Closing out (I am %d)\n" (Unix.getpid()); close_out oc),
+     (fun () -> Printf.printf "Closing in (I am %d)\n" (Unix.getpid()); close_in ic)
     )
 ;;  
 
