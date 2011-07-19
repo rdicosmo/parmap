@@ -19,6 +19,19 @@ open Util
 type outcome = Res of payload | Fail of exn
 and payload = int * int (* pid + size of result *)
 
+(* create a pipe, and return the access functions, as well as the underlying file descriptor *)
+
+let mkpipe () =
+    let (ifd,ofd) = Unix.pipe () in
+    let (ic, oc) = (Unix.in_channel_of_descr ifd, Unix.out_channel_of_descr ofd) in
+    ((fun x ->  Marshal.to_channel oc x [Marshal.Closures]; flush oc),
+     (fun () -> Marshal.from_channel ic),
+     (fun () -> close_out oc),
+     (fun () -> close_in ic),
+     ifd
+    )
+;;  
+
 (* create a shadow file descriptor *)
 
 let tempfd () =
@@ -28,6 +41,10 @@ let tempfd () =
     Unix.unlink name;
     fd
   with e -> Unix.unlink name; raise e
+
+(* readers *)
+
+type 'a reader = (unit -> 'a) option
 
 (* the parallel map function *)
 
@@ -42,13 +59,16 @@ let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
   (* init task parameters *)
   let ln = List.length l in
   let chunksize = ln/ncores in
-  let pidl = ref [] in
+  let readers = Array.init ncores (fun _ -> None) in
   let maxsize=13000000 in
   let fdarr=Array.init ncores (fun _ -> Bigarray.Array1.map_file (tempfd()) Bigarray.char Bigarray.c_layout true maxsize) in
   for i = 0 to ncores-1 do
-    match Unix.fork() with
+    (* create a pipe for writing back the results *)
+    let (writep,readp,closew,closer,ifd) = mkpipe() in
+       match Unix.fork() with
       0 -> 
 	begin
+          closer();
           let pid = Unix.getpid() in
           let reschunk=ref [] in
           let limit=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
@@ -58,30 +78,40 @@ let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
 	    with _ -> (Printf.printf "Error: j=%d\n" j)
           done;
           Printf.eprintf "Process %d done computing\n" pid; flush stderr;
-          let s = Marshal.to_string (pid,List.rev !reschunk) [Marshal.Closures] in
-          Printf.eprintf "Process %d has marshaled result of size %d\n" pid (String.length s);
+          let s = Marshal.to_string (List.rev !reschunk) [Marshal.Closures] in
+          let sl = (String.length s) in
+          Printf.eprintf "Process %d has marshaled result of size %d\n" pid sl;
 	  for k = 0 to (String.length s)-1 do fdarr.(i).{k} <-s.[k] done;
+          writep sl; closew();
           exit 0
 	end
     | -1 ->  Printf.eprintf "Fork error: pid %d; i=%d.\n" (Unix.getpid()) i; 
     | pid -> (* collect the worker io data *)
-	(pidl:= pid::!pidl) 
+	(closew();(readers.(i)<- Some readp))
   done;
   (* wait for all childrens *)
-  List.iter (fun _ -> try ignore(Unix.wait()) with Unix.Unix_error (Unix.ECHILD, _, _) -> ()) !pidl;
+  for i = 0 to ncores-1 do try ignore(Unix.wait()) with Unix.Unix_error (Unix.ECHILD, _, _) -> () done;
   (* read in all data *)
-  (* stupid copy-buffer option *)
-  let s = String.make maxsize ' ' in
+  let sizes = Array.init ncores (fun _ -> 0) in
+  let maxs = ref 0 in
+  for i=0 to ncores-1 do
+    match readers.(i) 
+    with 
+      Some reader -> sizes.(i)<-reader(); maxs := max sizes.(i) !maxs
+    | _ -> failwith (Printf.sprintf "No register reader at index %d." i)
+  done;
+  (* copy-buffer option *)
+  let s = String.make !maxs ' ' in
   let res = ref [] in
   for i = 0 to ncores-1 do
-      for k = 0 to maxsize do try s.[k]<-fdarr.(i).{k} with _ -> () done;
+      for k = 0 to sizes.(i) do try s.[k]<-fdarr.(i).{k} with _ -> () done;
       res:= (Marshal.from_string s 0)::!res;
   done;
   Timer.stop tc ();  Timer.pp_timer Format.std_formatter tc;
   (* is _this_ taking too much time? *)
   Timer.start t;
   let l = 
-    List.flatten (List.map (fun pid -> List.assoc pid !res) (List.rev !pidl))
+    List.flatten (List.rev !res)
   in 
   Timer.stop t (); Timer.pp_timer Format.std_formatter t;
   l 
