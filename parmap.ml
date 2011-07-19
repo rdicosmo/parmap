@@ -14,30 +14,6 @@
 open Common
 open Util
 
-(* create a pipe, and return the access functions, as well as the underlying file descriptor *)
-
-let mkpipe () =
-    let (ifd,ofd) = Unix.pipe () in
-    let (ic, oc) = (Unix.in_channel_of_descr ifd, Unix.out_channel_of_descr ofd) in
-    ((fun x ->  Marshal.to_channel oc x [Marshal.Closures]; flush oc),
-     (fun () -> Marshal.from_channel ic),
-     (fun () -> close_out oc),
-     (fun () -> close_in ic),
-     ifd
-    )
-;;  
-
-(* the worker io data structure *)
-
-type 'a wio = {pid:int; ifd:Unix.file_descr; reader: unit -> 'a}
-
-(* select ready wios *)
-
-let select_wios wiol =
-  let inset = List.map (fun wio -> wio.ifd) wiol in
-  let ready, _, _ = Unix.select inset [] [] (-1.) in
-  List.partition (fun wio -> List.memq wio.ifd ready) wiol
-
 (* the parallel map function *)
 
 let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
@@ -51,14 +27,11 @@ let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
   (* init task parameters *)
   let ln = List.length l in
   let chunksize = ln/ncores in
-  let wiol = ref [] in
+  let pidl = ref [] in
   for i = 0 to ncores-1 do
-    (* create a pipe for writing back the results *)
-    let (writep,readp,closew,closer,ifd) = mkpipe() in
     match Unix.fork() with
       0 -> 
 	begin
-	  closer();
           let reschunk=ref [] in
           let limit=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
           for j=i*chunksize to limit do
@@ -67,33 +40,28 @@ let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
 	    with _ -> (Printf.printf "Error: j=%d\n" j)
           done;
           Printf.eprintf "Process %d done computing\n" (Unix.getpid()); flush stderr;
-          writep (List.rev !reschunk); closew();
+          let oc = open_out (Printf.sprintf ".res_%d" i) in
+	    Marshal.to_channel oc (Unix.getpid(),(List.rev !reschunk)) [Marshal.Closures]; close_out oc;
           exit 0
 	end
     | -1 ->  Printf.eprintf "Fork error: pid %d; i=%d.\n" (Unix.getpid()) i; 
     | pid -> (* collect the worker io data *)
-	(closew(); wiol:= {pid=pid;reader=readp;ifd=ifd}::!wiol) 
-  done;
-  (* now do read all the results using a select *)
-  let res = ref [] in
-  let waiting = ref !wiol in
-  while !waiting != [] do
-    let idle,busy=select_wios !waiting in
-    List.iter 
-      (fun wio -> 
-	try 
-	  res:= (wio.pid,wio.reader())::!res
-	with e -> (Printf.printf "Read error on pid %d\n" wio.pid; raise e)
-      ) idle;
-    waiting:=busy
+	(pidl:= pid::!pidl) 
   done;
   (* wait for all childrens *)
-  List.iter (fun _ -> try ignore(Unix.wait()) with Unix.Unix_error (Unix.ECHILD, _, _) -> ()) !wiol;
+  List.iter (fun _ -> try ignore(Unix.wait()) with Unix.Unix_error (Unix.ECHILD, _, _) -> ()) !pidl;
+  (* read in all data *)
+  let res = ref [] in
+  for i = 0 to ncores-1 do
+    let fn = (Printf.sprintf ".res_%d" i) in
+    let ic = open_in fn in
+      res:= (Marshal.from_channel ic)::!res; close_in ic; (* Unix.unlink fn *)
+  done;
   Timer.stop tc ();  Timer.pp_timer Format.std_formatter tc;
   (* is _this_ taking too much time? *)
   Timer.start t;
   let l = 
-    List.flatten (List.map (fun pid -> List.assoc pid !res) (List.rev (List.map (fun x -> x.pid) !wiol)))
+    List.flatten (List.map (fun pid -> List.assoc pid !res) (List.rev !pidl))
   in 
   Timer.stop t (); Timer.pp_timer Format.std_formatter t;
   l 
