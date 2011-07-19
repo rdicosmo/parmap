@@ -14,51 +14,36 @@
 open Common
 open Util
 
-(* create a pipe, and return the access functions, as well as the underlying file descriptor *)
-
-let mkpipe () =
-    let (ifd,ofd) = Unix.pipe () in
-    let (ic, oc) = (Unix.in_channel_of_descr ifd, Unix.out_channel_of_descr ofd) in
-    ((fun x ->  Marshal.to_channel oc x [Marshal.Closures]; flush oc),
-     (fun () -> Marshal.from_channel ic),
-     (fun () -> close_out oc),
-     (fun () -> close_in ic),
-     ifd
-    )
-;;  
-
-(* the worker io data structure *)
-
-type 'a wio = {pid:int; ifd:Unix.file_descr; reader: unit -> 'a}
-
-(* select ready wios *)
-
-let select_wios wiol =
-  let inset = List.map (fun wio -> wio.ifd) wiol in
-  let ready, _, _ = Unix.select inset [] [] (-1.) in
-  List.partition (fun wio -> List.memq wio.ifd ready) wiol
-
 (* the parallel map function *)
+
 
 let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
   let t = Timer.create "collection" in
   Timer.enable "collection";
   let tc = Timer.create "computation" in
   Timer.enable "computation";
+  let tm = Timer.create "marshalling" in
+  Timer.enable "marshalling";
   Timer.start tc;
   (* flush everything *)
   flush stdout; flush stderr;
   (* init task parameters *)
   let ln = List.length l in
   let chunksize = ln/ncores in
-  let wiol = ref [] in
+  let port=4000 in
+  let sock = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
+  let sockaddr = Unix.ADDR_INET (Unix.inet_addr_any, port) in
+  Unix.setsockopt sock Unix.SO_REUSEADDR true;
+  Unix.setsockopt sock Unix.SO_KEEPALIVE true;
+  Unix.setsockopt_int sock Unix.SO_SNDBUF 1000000;
+  Unix.setsockopt_int sock Unix.SO_RCVBUF 1000000;
+  Unix.bind sock sockaddr;
+  Unix.listen sock ncores;
   for i = 0 to ncores-1 do
-    (* create a pipe for writing back the results *)
-    let (writep,readp,closew,closer,ifd) = mkpipe() in
-    match Unix.fork() with
+       match Unix.fork() with
       0 -> 
 	begin
-	  closer();
+          let pid = Unix.getpid() in
           let reschunk=ref [] in
           let limit=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
           for j=i*chunksize to limit do
@@ -66,37 +51,33 @@ let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
               reschunk := (f (List.nth l j))::!reschunk
 	    with _ -> (Printf.printf "Error: j=%d\n" j)
           done;
-          Printf.eprintf "Process %d done computing\n" (Unix.getpid()); flush stderr;
-          writep (List.rev !reschunk); closew();
+          Printf.eprintf "Process %d done computing\n" pid; flush stderr;
+          (* now connect back to the parent, and send the results *) 
+          let (ic,oc)=Unix.open_connection sockaddr in
+          Marshal.to_channel oc (i,List.rev !reschunk) [Marshal.Closures];
+          Printf.eprintf "Process %d has marshaled result\n" pid;
           exit 0
 	end
     | -1 ->  Printf.eprintf "Fork error: pid %d; i=%d.\n" (Unix.getpid()) i; 
-    | pid -> (* collect the worker io data *)
-	(closew(); wiol:= {pid=pid;reader=readp;ifd=ifd}::!wiol) 
+    | pid -> ()
   done;
-  (* now do read all the results using a select *)
-  let res = ref [] in
-  let waiting = ref !wiol in
-  while !waiting != [] do
-    let idle,busy=select_wios !waiting in
-    List.iter 
-      (fun wio -> 
-	try 
-	  res:= (wio.pid,wio.reader())::!res
-	with e -> (Printf.printf "Read error on pid %d\n" wio.pid; raise e)
-      ) idle;
-    waiting:=busy
+
+
+  let res = Array.init ncores (fun _ -> []) in
+
+  for i = 0 to ncores-1 do
+    let (fd,saddr) = try Unix.accept sock with e -> (Printf.eprintf "Error in accept"; raise e) in (* accepting the connection *)
+    let ic=Unix.in_channel_of_descr fd in 
+    let (n,v) = Marshal.from_channel ic in
+    res.(n)<-v
   done;
+
   (* wait for all childrens *)
-  List.iter (fun _ -> try ignore(Unix.wait()) with Unix.Unix_error (Unix.ECHILD, _, _) -> ()) !wiol;
+  for i = 0 to ncores-1 do try ignore(Unix.wait()) with Unix.Unix_error (Unix.ECHILD, _, _) -> () done;
   Timer.stop tc ();  Timer.pp_timer Format.std_formatter tc;
-  (* is _this_ taking too much time? *)
-  Timer.start t;
-  let l = 
-    List.flatten (List.map (fun pid -> List.assoc pid !res) (List.rev (List.map (fun x -> x.pid) !wiol)))
-  in 
-  Timer.stop t (); Timer.pp_timer Format.std_formatter t;
-  l 
+  Unix.shutdown sock Unix.SHUTDOWN_ALL;
+  Unix.close sock;
+  List.flatten (Array.to_list res) 
 ;;
 
 
