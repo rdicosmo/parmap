@@ -53,6 +53,8 @@ let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
   Timer.enable "collection";
   let tc = Timer.create "computation" in
   Timer.enable "computation";
+  let tm = Timer.create "marshalling" in
+  Timer.enable "marshalling";
   Timer.start tc;
   (* flush everything *)
   flush stdout; flush stderr;
@@ -78,11 +80,14 @@ let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
 	    with _ -> (Printf.printf "Error: j=%d\n" j)
           done;
           Printf.eprintf "Process %d done computing\n" pid; flush stderr;
+          Timer.start tm;
           let s = Marshal.to_string (List.rev !reschunk) [Marshal.Closures] in
           let sl = (String.length s) in
+          Timer.stop tm (); Timer.pp_timer Format.std_formatter tm;
           Printf.eprintf "Process %d has marshaled result of size %d\n" pid sl;
 	  for k = 0 to (String.length s)-1 do fdarr.(i).{k} <-s.[k] done;
-          writep sl; closew();
+          writep sl; 
+          closew();
           exit 0
 	end
     | -1 ->  Printf.eprintf "Fork error: pid %d; i=%d.\n" (Unix.getpid()) i; 
@@ -98,7 +103,7 @@ let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
     match readers.(i) 
     with 
       Some reader -> sizes.(i)<-reader(); maxs := max sizes.(i) !maxs
-    | _ -> failwith (Printf.sprintf "No register reader at index %d." i)
+    | _ -> failwith (Printf.sprintf "No registered reader at index %d." i)
   done;
   (* copy-buffer option *)
   let s = String.make !maxs ' ' in
