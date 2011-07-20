@@ -14,23 +14,7 @@
 open Common
 open Util
 
-(* informations from child to parents *)
 
-type outcome = Res of payload | Fail of exn
-and payload = int * int (* pid + size of result *)
-
-(* create a pipe, and return the access functions, as well as the underlying file descriptor *)
-
-let mkpipe () =
-    let (ifd,ofd) = Unix.pipe () in
-    let (ic, oc) = (Unix.in_channel_of_descr ifd, Unix.out_channel_of_descr ofd) in
-    ((fun x ->  Marshal.to_channel oc x [Marshal.Closures]; flush oc),
-     (fun () -> Marshal.from_channel ic),
-     (fun () -> close_out oc),
-     (fun () -> close_in ic),
-     ifd
-    )
-;;  
 
 (* create a shadow file descriptor *)
 
@@ -42,9 +26,20 @@ let tempfd () =
     fd
   with e -> Unix.unlink name; raise e
 
-(* readers *)
+(* unmarshal from a mmap seen as a bigarray *)
+let unmarshal_from_mmap fd =
+ let read_mmap ofs len = 
+   let s = String.make len ' ' in
+   for k = 0 to len-1 do s.[k]<-fd.{ofs+k} done;
+   s
+ in
+ (* read the header *)
+ let s = read_mmap 0 Marshal.header_size in
+ let size=Marshal.total_size s 0 in
+ let s' = read_mmap 0 size in
+ Marshal.from_string s' 0
+;;
 
-type 'a reader = (unit -> 'a) option
 
 (* the parallel map function *)
 
@@ -61,16 +56,12 @@ let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
   (* init task parameters *)
   let ln = List.length l in
   let chunksize = ln/ncores in
-  let readers = Array.init ncores (fun _ -> None) in
-  let maxsize=13000000 in
+  let maxsize = 15000000 in
   let fdarr=Array.init ncores (fun _ -> Bigarray.Array1.map_file (tempfd()) Bigarray.char Bigarray.c_layout true maxsize) in
   for i = 0 to ncores-1 do
-    (* create a pipe for writing back the results *)
-    let (writep,readp,closew,closer,ifd) = mkpipe() in
        match Unix.fork() with
       0 -> 
 	begin
-          closer();
           let pid = Unix.getpid() in
           let reschunk=ref [] in
           let limit=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
@@ -85,32 +76,18 @@ let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
           let sl = (String.length s) in
           Timer.stop tm (); Timer.pp_timer Format.std_formatter tm;
           Printf.eprintf "Process %d has marshaled result of size %d\n" pid sl;
-	  for k = 0 to (String.length s)-1 do fdarr.(i).{k} <-s.[k] done;
-          writep sl; 
-          closew();
+	  for k = 0 to sl-1 do fdarr.(i).{k} <-s.[k] done;
           exit 0
 	end
     | -1 ->  Printf.eprintf "Fork error: pid %d; i=%d.\n" (Unix.getpid()) i; 
-    | pid -> (* collect the worker io data *)
-	(closew();(readers.(i)<- Some readp))
+    | pid -> ()
   done;
   (* wait for all childrens *)
   for i = 0 to ncores-1 do try ignore(Unix.wait()) with Unix.Unix_error (Unix.ECHILD, _, _) -> () done;
   (* read in all data *)
-  let sizes = Array.init ncores (fun _ -> 0) in
-  let maxs = ref 0 in
-  for i=0 to ncores-1 do
-    match readers.(i) 
-    with 
-      Some reader -> sizes.(i)<-reader(); maxs := max sizes.(i) !maxs
-    | _ -> failwith (Printf.sprintf "No registered reader at index %d." i)
-  done;
-  (* copy-buffer option *)
-  let s = String.make !maxs ' ' in
   let res = ref [] in
   for i = 0 to ncores-1 do
-      for k = 0 to sizes.(i) do try s.[k]<-fdarr.(i).{k} with _ -> () done;
-      res:= (Marshal.from_string s 0)::!res;
+      res:= (unmarshal_from_mmap fdarr.(i)) ::!res;
   done;
   Timer.stop tc ();  Timer.pp_timer Format.std_formatter tc;
   (* is _this_ taking too much time? *)
