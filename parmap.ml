@@ -46,6 +46,23 @@ let tempfd () =
 
 type 'a reader = (unit -> 'a) option
 
+(* unmarshaling from a mmap *)
+
+let unmarshal_using_mmap fd =
+  let mm = Mmap.mmap fd Mmap.RDWR Mmap.SHARED Marshal.header_size 0 in 
+  let header = Mmap.read mm 0 Marshal.header_size in
+  Mmap.unmap mm;
+  let size = Marshal.total_size header 0 in
+  Printf.eprintf "Reading %d bytes from mmap\n" size;
+  let mm = Mmap.mmap fd Mmap.RDWR Mmap.SHARED size 0 in 
+  let s = Mmap.read mm 0 size in
+  Printf.eprintf "Read %d bytes from mmap\n" size;  
+  Mmap.unmap mm;
+  Marshal.from_string s 0
+;;
+
+let map_size = 60000000;;
+
 (* the parallel map function *)
 
 let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
@@ -62,8 +79,8 @@ let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
   let ln = List.length l in
   let chunksize = ln/ncores in
   let readers = Array.init ncores (fun _ -> None) in
-  let maxsize=13000000 in
-  let fdarr=Array.init ncores (fun _ -> Bigarray.Array1.map_file (tempfd()) Bigarray.char Bigarray.c_layout true maxsize) in
+  (* create the file descriptors used for mmapping *)
+  let fdarr=Array.init ncores (fun _ -> tempfd()) in
   for i = 0 to ncores-1 do
     (* create a pipe for writing back the results *)
     let (writep,readp,closew,closer,ifd) = mkpipe() in
@@ -85,7 +102,21 @@ let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
           let sl = (String.length s) in
           Timer.stop tm (); Timer.pp_timer Format.std_formatter tm;
           Printf.eprintf "Process %d has marshaled result of size %d\n" pid sl;
-	  for k = 0 to (String.length s)-1 do fdarr.(i).{k} <-s.[k] done;
+          (* stretch the file to the required size *)
+          ignore(Unix.lseek fdarr.(i) sl Unix.SEEK_SET); 
+          ignore(Unix.write fdarr.(i) "0" 0 1);
+          (* rewind the file *)
+          ignore(Unix.lseek fdarr.(i) 0 Unix.SEEK_SET); 
+          (* create the mmap *)
+          let mm = Mmap.mmap fdarr.(i) Mmap.RDWR Mmap.SHARED sl 0 in
+          (* write marshal output on the mmap *)
+	  Mmap.write mm s 0 sl;
+          Printf.eprintf "Process %d has successfully written result of size %d\n" pid sl;
+          let s' = Mmap.read mm 0 sl in
+          if s=s' then
+            Printf.eprintf "Process %d has successfully re-read and verified result of size %d\n" pid sl
+          else 
+            Printf.eprintf "Process %d has successfully re-read result of size %d\n" pid sl;
           writep sl; 
           closew();
           exit 0
@@ -106,11 +137,10 @@ let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
     | _ -> failwith (Printf.sprintf "No registered reader at index %d." i)
   done;
   (* copy-buffer option *)
-  let s = String.make !maxs ' ' in
   let res = ref [] in
   for i = 0 to ncores-1 do
-      for k = 0 to sizes.(i) do try s.[k]<-fdarr.(i).{k} with _ -> () done;
-      res:= (Marshal.from_string s 0)::!res;
+      let v = unmarshal_using_mmap fdarr.(i) in 
+      res:= v::!res;
   done;
   Timer.stop tc ();  Timer.pp_timer Format.std_formatter tc;
   (* is _this_ taking too much time? *)
