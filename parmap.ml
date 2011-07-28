@@ -14,7 +14,16 @@
 open Common
 open Util
 
+(* timers *)
 
+let t = Timer.create "collection";;
+Timer.enable "collection";;
+let tc = Timer.create "computation";;
+Timer.enable "computation";;
+let tm = Timer.create "marshalling";;
+Timer.enable "marshalling";;
+let tu = Timer.create "unmarshalling";;
+Timer.enable "unmarshalling";;
 
 (* create a shadow file descriptor *)
 
@@ -28,9 +37,10 @@ let tempfd () =
 
 (* unmarshal from a mmap seen as a bigarray *)
 let unmarshal_from_mmap fd =
+ let a=Bigarray.Array1.map_file fd Bigarray.char Bigarray.c_layout true (-1) in
  let read_mmap ofs len = 
    let s = String.make len ' ' in
-   for k = 0 to len-1 do s.[k]<-fd.{ofs+k} done;
+   for k = 0 to len-1 do s.[k]<-a.{ofs+k} done;
    s
  in
  (* read the header *)
@@ -40,24 +50,28 @@ let unmarshal_from_mmap fd =
  Marshal.from_string s' 0
 ;;
 
+(* marshal to a mmap seen as a bigarray *)
+
+let marshal_to_mmap pid fd v = 
+  Timer.start tm;
+  let s = Marshal.to_string v [Marshal.Closures] in
+  let sl = (String.length s) in
+  Timer.stop tm (); Timer.pp_timer Format.std_formatter tm; Printf.eprintf "Process %d has marshaled result of size %d\n" pid sl;
+  let ba = Bigarray.Array1.map_file fd Bigarray.char Bigarray.c_layout true sl in
+  for k = 0 to sl-1 do ba.{k} <-s.[k] done;
+  Unix.close fd
+;;
 
 (* the parallel map function *)
 
 let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
-  let t = Timer.create "collection" in
-  Timer.enable "collection";
-  let tc = Timer.create "computation" in
-  Timer.enable "computation";
-  let tm = Timer.create "marshalling" in
-  Timer.enable "marshalling";
   Timer.start tc;
   (* flush everything *)
   flush stdout; flush stderr;
   (* init task parameters *)
   let ln = List.length l in
   let chunksize = ln/ncores in
-  let maxsize = 15000000 in
-  let fdarr=Array.init ncores (fun _ -> Bigarray.Array1.map_file (tempfd()) Bigarray.char Bigarray.c_layout true maxsize) in
+  let fdarr=Array.init ncores (fun _ -> tempfd()) in
   for i = 0 to ncores-1 do
        match Unix.fork() with
       0 -> 
@@ -71,12 +85,7 @@ let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
 	    with _ -> (Printf.printf "Error: j=%d\n" j)
           done;
           Printf.eprintf "Process %d done computing\n" pid; flush stderr;
-          Timer.start tm;
-          let s = Marshal.to_string (List.rev !reschunk) [Marshal.Closures] in
-          let sl = (String.length s) in
-          Timer.stop tm (); Timer.pp_timer Format.std_formatter tm;
-          Printf.eprintf "Process %d has marshaled result of size %d\n" pid sl;
-	  for k = 0 to sl-1 do fdarr.(i).{k} <-s.[k] done;
+	  marshal_to_mmap pid fdarr.(i) (List.rev !reschunk);
           exit 0
 	end
     | -1 ->  Printf.eprintf "Fork error: pid %d; i=%d.\n" (Unix.getpid()) i; 
@@ -98,8 +107,3 @@ let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
   Timer.stop t (); Timer.pp_timer Format.std_formatter t;
   l 
 ;;
-
-
-(* example:
-List.iter (fun n -> Printf.printf "%d\n" n) (parmap (fun x -> x+1) [1;2;3;4;5;6;7;8;9;10;11;12;13] ~ncores:4);;
- *)
