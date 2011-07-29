@@ -1,0 +1,5 @@
+parmap.cmo: util.cmo parmap.cmi
+parmap.cmx: util.cmx parmap.cmi
+util.cmo:
+util.cmx:
+parmap.cmi: util.cmo
