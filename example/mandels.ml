@@ -13,7 +13,7 @@
 open Graphics;;
 
 let n   = 1000;; (* the size of the square screen windows in pixels      *)
-let res = 10000;; (* the resolution: maximum number of iterations allowed *)
+let res = 1000;; (* the resolution: maximum number of iterations allowed *)
 
 (* convert an integer in the range 0..res into a screen color *)
 
@@ -103,7 +103,7 @@ Printf.eprintf "Testing scalability with %d iterations on %d*2 to %d*2 cores\n" 
     let tot=ref 0.0 in
     for j=1 to iter do
       let d=Unix.gettimeofday() in
-      ignore(Parmap.parmap pixel tasks ~ncores:j);
+      ignore(Parmap.parmap pixel tasks ~ncores:i);
       tot:=!tot+.(Unix.gettimeofday()-.d)
     done;
     let speedup=tseq /. (!tot /. (float iter)) in 
@@ -111,7 +111,9 @@ Printf.eprintf "Testing scalability with %d iterations on %d*2 to %d*2 cores\n" 
   done
 ;;
 
-scale_test 1 tseq 1 10;;
+scale_test 2 tseq 1 4;;
 
 draw m;;
+
+ignore(input_line stdin);;
 
