@@ -12,12 +12,23 @@
 
 open Parmap
 
+let initsegm n = let rec aux acc = function 0 -> acc | n -> aux (n::acc) (n-1) in aux [] n
+;;
+
+let compute p = 
+  let r=ref 1 in 
+  for i = 1 to 80000 do 
+    r:= !r+(p*p)-(p*(p-1))
+  done;
+  !r
+;;
+
 let scale_test iter nprocmin nprocmax =
   Printf.eprintf "Testing scalability with %d iterations on %d*2 to %d*2 cores\n" iter nprocmin nprocmax;
-  let l = let rec aux acc = function 0 -> acc | n -> aux (n::acc) (n-1) in aux [] 10000 in
+  let l = initsegm 20000 in
   let cl,tseq =  
     let d=Unix.gettimeofday() in
-    let l' = List.map (fun p -> p*p) l
+    let l' = List.map compute l
     in l',(Unix.gettimeofday() -. d)
   in
   Printf.eprintf "Sequential execution takes %f seconds\n" tseq;
@@ -25,7 +36,7 @@ let scale_test iter nprocmin nprocmax =
     let tot=ref 0.0 in
     for j=1 to iter do
       let d=Unix.gettimeofday() in
-      ignore(parmap (fun p -> p*p) l ~ncores:(i*2));
+      ignore(parmap compute l ~ncores:(i*2));
       tot:=!tot+.(Unix.gettimeofday()-.d)
     done;
     let speedup=tseq /. (!tot /. (float iter)) in 
@@ -33,5 +44,5 @@ let scale_test iter nprocmin nprocmax =
   done
 ;;
 
-scale_test 20 4 20;;
+scale_test 2 1 10;;
 
