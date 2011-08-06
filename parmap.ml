@@ -61,13 +61,15 @@ let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
 	begin
           let pid = Unix.getpid() in
           let reschunk=ref [] in
-          let limit=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
-          for j=i*chunksize to limit do
+          let lo=i*chunksize in
+          let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
+          (* iterate in reverse order, to accumulate in the right order *)
+          for j=0 to (hi-lo) do
 	    try 
-              reschunk := (f (List.nth l j))::!reschunk
+              reschunk := (f (List.nth l (hi-j)))::!reschunk
 	    with _ -> (Printf.printf "Error: j=%d\n" j)
           done;
-	  marshal pid fdarr.(i) (List.rev !reschunk);
+	  marshal pid fdarr.(i) !reschunk;
           exit 0
 	end
     | -1 ->  Printf.eprintf "Fork error: pid %d; i=%d.\n" (Unix.getpid()) i; 
@@ -77,7 +79,8 @@ let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
   for i = 0 to ncores-1 do try ignore(Unix.wait()) with Unix.Unix_error (Unix.ECHILD, _, _) -> () done;
   (* read in all data *)
   let res = ref [] in
+  (* iterate in reverse order, to accumulate in the right order *)
   for i = 0 to ncores-1 do
-      res:= (unmarshal fdarr.(i)) ::!res;
+      res:= (unmarshal fdarr.((ncores-1)-i)) ::!res;
   done;
-  List.flatten (List.rev !res)
+  List.flatten !res
