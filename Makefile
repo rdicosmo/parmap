@@ -5,14 +5,14 @@ C_OBJS = ba_marshal_stubs
 OBJECTS  = $(foreach obj, $(OBJS),$(obj).cmo)
 XOBJECTS = $(foreach obj, $(OBJS),$(obj).cmx)
 LIBS = $(NAME).cma $(NAME).cmxa
-OCAMLC   = ocamlfind ocamlc
-OCAMLOPT = ocamlfind ocamlopt
+OCAMLC   = ocamlfind ocamlc -annot
+OCAMLOPT = ocamlfind ocamlopt -annot
 OCAMLDEP = ocamldep
 
 ARCHIVE  = $(NAME).cma
 XARCHIVE = $(NAME).cmxa
 
-REQUIRES = unix bigarray
+REQUIRES = extlib unix bigarray 
 
 all: $(ARCHIVE) $(XARCHIVE) 
 
