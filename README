@@ -1,0 +1,50 @@
+Parmap in a nutshell
+--------------------
+
+Parmap is a minimalistic library allowing  to exploit multicore architecture for
+OCaml programs with minimal modifications: if you want to use your many cores to
+accelerate an   operation  which  happens   to be   a  map,  fold    or map/fold
+(map-reduce),  just use  Parmap's  parmap, parfold  and parmapfold primitives in
+place  of the standard   List.map   and friends,  and  specify  the  number   of
+subprocesses to use by the optional parameter ~ncores.
+
+See the example directory for a couple of running programs.
+
+DO'S and DONT'S
+---------------
+
+Parmap is *not*  meant to be a replacement  for a full fledged implementation of
+parallelism skeletons  (map, reduce, pipe, and the  many others described in the
+scientific literature   since the end   of the  1980's,   much earlier  than the
+specific   implementation by Google   engineers  that popularised them).  It  is
+meant,  instead, to allow you to  quickly leverage the  idle processing power of
+your extra cores, when handling some heavy computational load.
+
+The principle of parmap is very simple: when you call one of the three available
+primitives, map, fold, and  mapfold , your OCaml  sequential program forks  in n
+subprocesses (you choose the n), and each subprocess performs the computation on
+the  1/n of the data, returing  the results through a  shared memory area to the
+parent process, that resumes  execution once all  the children  have terminated,
+and the data has been recollected.
+
+You need  to run your  program on a single multicore  machine;  repeat after me:
+Parmap  is   not meant to   run  on a cluster,  see   one of the  many available
+(re)implementations of the map-reduce schema for that.
+
+By forking the parent process  on a sigle  machine, the children get access, for
+free, to all the data structures already built, even the imperative ones, and as
+far as your computation  inside the map/fold  does not produce side effects that
+need  to be  preserved, the  final result will   be the same  as  performing the
+sequential operation, the only difference is that you might get it faster.
+
+The OCaml code is quite simple and does not rely on any  external C library: all
+the magic is done by your operating system's fork and memory mapping mechanisms.
+One could gain some speed by implementing a marshal/unmarshal operation directly
+on bigarrays, but we did not do this yet.
+
+Of course, if you happen  to have open  channels, or files, or other connections
+that should only be  used by the parent  process, your program  may behave in  a
+very wierd way: as an example, *do  not* open a  graphic window before calling a
+Parmap primitive, and   *do   not*  use  this  library   if  your  program    is
+multi-threaded!
+
