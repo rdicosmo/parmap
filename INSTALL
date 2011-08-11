@@ -1,0 +1,8 @@
+To install this program, just type
+
+make; make install
+
+To uninstall, type
+
+make uninstall
+
