@@ -3,10 +3,10 @@ Parmap in a nutshell
 
 Parmap is a minimalistic library allowing  to exploit multicore architecture for
 OCaml programs with minimal modifications: if you want to use your many cores to
-accelerate an operation which happen to be a map, fold or map/fold (map-reduce),
-just  use Parmap's parmap,  parfold  and parmapfold primitives  in place  of the
-standard List.map and friends, and specify the number of  subprocesses to use by
-the optional parameter ~ncores.
+accelerate an   operation  which  happens   to be   a  map,  fold    or map/fold
+(map-reduce),  just use  Parmap's  parmap, parfold  and parmapfold primitives in
+place  of the standard   List.map   and friends,  and  specify  the  number   of
+subprocesses to use by the optional parameter ~ncores.
 
 See the example directory for a couple of running programs.
 
@@ -29,22 +29,22 @@ and the data has been recollected.
 
 You need  to run your  program on a single multicore  machine;  repeat after me:
 Parmap  is   not meant to   run  on a cluster,  see   one of the  many available
-reimplementations of the map-reduce schema for that.
+(re)implementations of the map-reduce schema for that.
 
-By forking the parent process  on a sigle machine,  the children get access, for
+By forking the parent process  on a sigle  machine, the children get access, for
 free, to all the data structures already built, even the imperative ones, and as
-far as your computation  inside the map/fold does not  produce side  effect that
-need to  be preserved,  the  final result  will be  the  same as  performing the
-sequential operation, only faster.
+far as your computation  inside the map/fold  does not produce side effects that
+need  to be  preserved, the  final result will   be the same  as  performing the
+sequential operation, the only difference is that you might get it faster.
 
 The OCaml code is quite simple and does not rely on any  external C library: all
-the magic is done by your operating system's fork and memory mapping mechaninms.
+the magic is done by your operating system's fork and memory mapping mechanisms.
 One could gain some speed by implementing a marshal/unmarshal operation directly
 on bigarrays, but we did not do this yet.
 
-Of course, if you happen to have opened channels, or files, or other connections
-that  should only be used by  the parent process, your  program  may behave in a
+Of course, if you happen  to have open  channels, or files, or other connections
+that should only be  used by the parent  process, your program  may behave in  a
 very wierd way: as an example, *do  not* open a  graphic window before calling a
-Parmap primitive,    and  *do not*    use  this  library if   your   program  is
+Parmap primitive, and   *do   not*  use  this  library   if  your  program    is
 multi-threaded!
 
