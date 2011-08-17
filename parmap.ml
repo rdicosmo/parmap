@@ -97,6 +97,6 @@ let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
 
 (* the parallel fold function *)
 
-let parfold (l:'a list) (op:'a -> 'b -> 'b) (opid:'b) ?(ncores=1) : 'b=
+let parfold (op:'a -> 'b -> 'b) (l:'a list) (opid:'b) ?(ncores=1) : 'b=
     parmapfold (fun x -> x) l op opid ~ncores
 ;;

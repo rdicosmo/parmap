@@ -13,6 +13,18 @@
 
 (** Module [Parmap]: parallel map on multicores. *)
 
+(** {6 Parallel mapfold} *)
+
+val parmapfold : ('a -> 'b) -> 'a list -> ('b-> 'c -> 'c) -> 'c -> ?ncores:int -> 'c
+
+  (** [parmapfold f l op b ~ncores:n ] computes [List.fold_right op (List.map f l) b] 
+      by forking [n] processes on a mulicore machine. *)
+
+(** {6 Parallel fold} *)
+val parfold: ('a -> 'b -> 'b) -> 'a list -> 'b -> ?ncores:int -> 'b
+  (** [parfold op l b ~ncores:n ] computes [List.fold_right op l b] 
+      by forking [n] processes on a mulicore machine. *)
+
 (** {6 Parallel map} *)
 
 val parmap : ('a -> 'b) -> 'a list -> ?ncores:int -> 'b list
