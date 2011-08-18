@@ -15,18 +15,28 @@
 
 (** {6 Parallel mapfold} *)
 
-val parmapfold : ('a -> 'b) -> 'a list -> ('b-> 'c -> 'c) -> 'c -> ?ncores:int -> 'c
+val parmapfold : ?ncores:int -> ('a -> 'b) -> 'a list -> ('b-> 'c -> 'c) -> 'c -> ('c->'c->'c) -> 'c
 
-  (** [parmapfold f l op b ~ncores:n ] computes [List.fold_right op (List.map f l) b] 
-      by forking [n] processes on a mulicore machine. *)
+  (** [parmapfold ~ncores:n f l op b concat ] computes [List.fold_right op (List.map f l) b] 
+      by forking [n] processes on a multicore machine. 
+      You need to provide the extra [concat] operator to combine the partial results of the
+      fold computed on each core. If 'b = 'c, then [concat] may be simply [op]. 
+      The order of computation in parallel changes w.r.t. sequential execution, so this 
+      function is only correct if [op] and [concat] are associative and commutative.
+      *)
 
 (** {6 Parallel fold} *)
-val parfold: ('a -> 'b -> 'b) -> 'a list -> 'b -> ?ncores:int -> 'b
-  (** [parfold op l b ~ncores:n ] computes [List.fold_right op l b] 
-      by forking [n] processes on a mulicore machine. *)
+val parfold: ?ncores:int -> ('a -> 'b -> 'b) -> 'a list -> 'b -> ('b->'b->'b) -> 'b
+  (** [parfold ~ncores:n op l b concat] computes [List.fold_right op l b] 
+      by forking [n] processes on a multicore machine.
+      You need to provide the extra [concat] operator to combine the partial results of the
+      fold computed on each core. If 'b = 'c, then [concat] may be simply [op]. 
+      The order of computation in parallel changes w.r.t. sequential execution, so this 
+      function is only correct if [op] and [concat] are associative and commutative.
+      *)
 
 (** {6 Parallel map} *)
 
-val parmap : ('a -> 'b) -> 'a list -> ?ncores:int -> 'b list
-  (** [parmap f l ~ncores:n ] computes [List.map f l] 
-      by forking [n] processes on a mulicore machine. *)
+val parmap : ?ncores:int -> ('a -> 'b) -> 'a list -> 'b list
+  (** [parmap  ~ncores:n f l ] computes [List.map f l] 
+      by forking [n] processes on a multicore machine. *)

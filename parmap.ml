@@ -50,7 +50,7 @@ let tempfd () =
 
 (* the core parallel mapfold function *)
 
-let parmapfold (f:'a -> 'b) (l:'a list) (op:'b->'c->'c) (opid:'c) ?(ncores=1) : 'c=
+let parmapfold ?(ncores=1) (f:'a -> 'b) (l:'a list) (op:'b->'c->'c) (opid:'c) (concat:'c->'c->'c) : 'c=
   (* flush everything *)
   flush stdout; flush stderr;
   (* init task parameters *)
@@ -71,7 +71,7 @@ let parmapfold (f:'a -> 'b) (l:'a list) (op:'b->'c->'c) (opid:'c) ?(ncores=1) : 
               reschunk := op (f (List.nth l (hi-j))) !reschunk
 	    with _ -> (Printf.printf "Error: j=%d\n" j)
           done;
-	  marshal pid fdarr.(i) !reschunk;
+	  marshal pid fdarr.(i) (!reschunk:'d);
           exit 0
 	end
     | -1 ->  Printf.eprintf "Fork error: pid %d; i=%d.\n" (Unix.getpid()) i; 
@@ -83,20 +83,20 @@ let parmapfold (f:'a -> 'b) (l:'a list) (op:'b->'c->'c) (opid:'c) ?(ncores=1) : 
   let res = ref [] in
   (* iterate in reverse order, to accumulate in the right order *)
   for i = 0 to ncores-1 do
-      res:= (unmarshal fdarr.((ncores-1)-i))::!res;
+      res:= ((unmarshal fdarr.((ncores-1)-i)):'d)::!res;
   done;
   (* use extLib's tail recursive one *)
-  List.fold_right op (List.flatten !res) opid
+  List.fold_right concat !res opid
 ;;
 
 (* the parallel map function *)
 
-let parmap (f:'a -> 'b) (l:'a list) ?(ncores=1) : 'b list=
-    parmapfold f l (fun v acc -> v::acc) [] ~ncores
+let parmap ?(ncores=1) (f:'a -> 'b) (l:'a list) : 'b list=
+    parmapfold f l (fun v acc -> v::acc) [] ~ncores (@) 
 ;;
 
 (* the parallel fold function *)
 
-let parfold (op:'a -> 'b -> 'b) (l:'a list) (opid:'b) ?(ncores=1) : 'b=
-    parmapfold (fun x -> x) l op opid ~ncores
+let parfold ?(ncores=1) (op:'a -> 'b -> 'b) (l:'a list) (opid:'b) (concat:'b->'b->'b) : 'b=
+    parmapfold ~ncores (fun x -> x) l op opid concat
 ;;

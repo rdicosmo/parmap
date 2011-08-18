@@ -28,7 +28,7 @@ let scale_test iter nprocmin nprocmax =
   let l = initsegm 20000 in
   let cl,tseq =  
     let d=Unix.gettimeofday() in
-    let l' = List.map compute l
+    let l' = List.fold_right (+) (List.map compute l) 0
     in l',(Unix.gettimeofday() -. d)
   in
   Printf.eprintf "Sequential execution takes %f seconds\n" tseq;
@@ -36,7 +36,7 @@ let scale_test iter nprocmin nprocmax =
     let tot=ref 0.0 in
     for j=1 to iter do
       let d=Unix.gettimeofday() in
-      let cl'=parmap ~ncores:(i*2) compute l in
+      let cl'=parmapfold ~ncores:(i*2) compute l (+) 0 (+) in
       tot:=!tot+.(Unix.gettimeofday()-.d);
       if cl<>cl' then Printf.eprintf "Parmap failure: result mismatch\n"
     done;
