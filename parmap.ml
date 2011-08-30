@@ -48,13 +48,21 @@ let tempfd () =
     fd
   with e -> Unix.unlink name; raise e
 
+type 'a sequence = L of 'a list | A of 'a array;;
+
 (* the core parallel mapfold function *)
 
-let parmapfold ?(ncores=1) (f:'a -> 'b) (l:'a list) (op:'b->'c->'c) (opid:'c) (concat:'c->'c->'c) : 'c=
+let parmapfold ?(ncores=1) (f:'a -> 'b) (s:'a sequence) (op:'b->'c->'c) (opid:'c) (concat:'c->'c->'c) : 'c=
   (* flush everything *)
   flush stdout; flush stderr;
+  (* enforce array to speed up access to the list elements *)
+  let al = 
+    match s with 
+      A al -> al
+    | L l  -> Array.of_list l 
+  in
   (* init task parameters *)
-  let ln = List.length l in
+  let ln = Array.length al in
   let chunksize = ln/ncores in
   let fdarr=Array.init ncores (fun _ -> tempfd()) in
   for i = 0 to ncores-1 do
@@ -68,7 +76,7 @@ let parmapfold ?(ncores=1) (f:'a -> 'b) (l:'a list) (op:'b->'c->'c) (opid:'c) (c
           (* iterate in reverse order, to accumulate in the right order *)
           for j=0 to (hi-lo) do
 	    try 
-              reschunk := op (f (List.nth l (hi-j))) !reschunk
+              reschunk := op (f (al.(hi-j))) !reschunk
 	    with _ -> (Printf.printf "Error: j=%d\n" j)
           done;
 	  marshal pid fdarr.(i) (!reschunk:'d);
@@ -91,12 +99,12 @@ let parmapfold ?(ncores=1) (f:'a -> 'b) (l:'a list) (op:'b->'c->'c) (opid:'c) (c
 
 (* the parallel map function *)
 
-let parmap ?(ncores=1) (f:'a -> 'b) (l:'a list) : 'b list=
-    parmapfold f l (fun v acc -> v::acc) [] ~ncores (@) 
+let parmap ?(ncores=1) (f:'a -> 'b) (s:'a sequence) : 'b list=
+    parmapfold f s (fun v acc -> v::acc) [] ~ncores (@) 
 ;;
 
 (* the parallel fold function *)
 
-let parfold ?(ncores=1) (op:'a -> 'b -> 'b) (l:'a list) (opid:'b) (concat:'b->'b->'b) : 'b=
-    parmapfold ~ncores (fun x -> x) l op opid concat
+let parfold ?(ncores=1) (op:'a -> 'b -> 'b) (s:'a sequence) (opid:'b) (concat:'b->'b->'b) : 'b=
+    parmapfold ~ncores (fun x -> x) s op opid concat
 ;;

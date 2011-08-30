@@ -1,0 +1,4 @@
+2011/08/30 (RDC): internally convert lists to array to avoid quadratic penalty in execution time on long lists,
+	          thanks to Paul Vernaza <pvernaza@andrew.cmu.edu> for pointing out this issu;
+	          added 'a sequence type to allow using efficiently the library both with lists and arrays.
+                  

@@ -29,7 +29,7 @@ let scale_test iter nprocmin nprocmax =
     let tot=ref 0.0 in
     for j=1 to iter do
       let d=Unix.gettimeofday() in
-      let cl'=parfold ~ncores:(i*2) (+) l 0 (+) in
+      let cl'=parfold ~ncores:(i*2) (+) (L l) 0 (+) in
       tot:=!tot+.(Unix.gettimeofday()-.d);
       if cl<>cl' then Printf.eprintf "Parfold failure: result mismatch\n"
     done;

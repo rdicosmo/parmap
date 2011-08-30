@@ -103,7 +103,7 @@ Printf.eprintf "Testing scalability with %d iterations on %d*2 to %d*2 cores\n" 
     let tot=ref 0.0 in
     for j=1 to iter do
       let d=Unix.gettimeofday() in
-      ignore(Parmap.parmap  ~ncores:i pixel tasks);
+      ignore(Parmap.parmap  ~ncores:i pixel (Parmap.L tasks));
       tot:=!tot+.(Unix.gettimeofday()-.d)
     done;
     let speedup=tseq /. (!tot /. (float iter)) in 
