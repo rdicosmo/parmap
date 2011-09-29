@@ -1,5 +1,5 @@
 name = "parmap"
-version = "0.9.1"
+version = "0.9.4"
 description = "Parallel map primitive for multicores"
 requires = "extlib bigarray unix"
 archive(byte) = "parmap.cma"
