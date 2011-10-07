@@ -77,7 +77,7 @@ let parmapfold ?(ncores=1) (f:'a -> 'b) (s:'a sequence) (op:'b->'c->'c) (opid:'c
           for j=0 to (hi-lo) do
 	    try 
               reschunk := op (f (al.(hi-j))) !reschunk
-	    with _ -> (Printf.printf "Error: j=%d\n" j)
+	    with e -> (Printf.printf "Error: at index j=%d got exception %s\n" j (Printexc.to_string e))
           done;
 	  marshal pid fdarr.(i) (!reschunk:'d);
           exit 0
