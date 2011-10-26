@@ -82,7 +82,7 @@ type 'a sequence = L of 'a list | A of 'a array;;
 
 (* the type of messages exchanged between master and workers *)
 
-type msg = Ready | Finished | Task of int;;
+type msg = Ready | Finished | Task of int | Error of int * string;;
 
 (* the core parallel mapfold function *)
 
@@ -112,17 +112,15 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
           let d=Unix.gettimeofday() and pid = Unix.getpid() in
           let reschunk=ref opid in
           let (ic,oc)=Unix.open_connection sockaddr in
+          let finish () = try Unix.shutdown_connection ic with _ -> (); exit 0 in 
 	  while true do
             (* ask for work until we are finished *)
 	    if debug then Printf.eprintf "Sending Ready token (pid=%d)\n%!" pid;
-            Marshal.to_channel oc Ready [Marshal.Closures]; flush oc;
+            Marshal.to_channel oc Ready []; flush oc;
             let token = (Marshal.from_channel ic) in
 	    if debug then Printf.eprintf "Received token from master (pid=%d)\n%!" pid;
             match token with
-	    | Finished -> 
-		(marshal pid fdarr.(i) (!reschunk:'d);
-		 try Unix.shutdown_connection ic with _ -> (); (* will fail if channel already closed *)
-		 exit 0)
+	    | Finished -> (marshal pid fdarr.(i) (!reschunk:'d); finish ())
 	    | Task i -> 
 		let lo=i*chunksize in
 		let hi=if i=ntasks-1 then ln-1 else (i+1)*chunksize-1 in
@@ -131,8 +129,12 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
 		  try 
 		    reschunk := op (f (al.(hi-j))) !reschunk;
 		  with e -> 
-		    (Printf.eprintf "[Parmap] Error at index j=%d in (%d,%d), chunksize=%d of a total of %d got exception %s on core %d \n"
-		       j hi lo chunksize (hi-lo+1) (Printexc.to_string e) i );
+		    begin
+		      let errmsg = Printexc.to_string e
+		      in Printf.eprintf "[Parmap] Error at index j=%d in (%d,%d), chunksize=%d of a total of %d got exception %s on core %d \n"
+			j hi lo chunksize (hi-lo+1) errmsg i;
+		      Marshal.to_channel oc (Error (i,errmsg)) []; flush oc; finish()
+		    end;
 		    Printf.eprintf "[Parmap] Worker on core %d, segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds\n"
 		      i hi lo ln chunksize (Unix.gettimeofday() -. d)
 		done;
@@ -161,7 +163,7 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
 	(if debug then Printf.eprintf "Sending task %d\n%!" i;
          let oc = (Unix.out_channel_of_descr wfd) in
 	 (Marshal.to_channel oc (Task i) []); flush oc)
-    | _ -> assert false
+    | Error (core,msg) -> (Printf.eprintf "[Parmap]: aborting due to exception on core %d: %s\n" core msg; exit 1)
     (* will need to add some code to properly close down all the channels incrementally *)
   done;
   
