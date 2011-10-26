@@ -23,6 +23,17 @@ let ext_intv startv endv =
   in aux [] e
 ;;
 
+(* freopen emulation, from Xavier's suggestion on OCaml mailing list *)
+
+let reopen_out outchan filename =
+  flush outchan;
+  let fd1 = Unix.descr_of_out_channel outchan in
+  let fd2 =
+    Unix.openfile filename [Unix.O_WRONLY; Unix.O_CREAT; Unix.O_TRUNC] 0o666 in
+  Unix.dup2 fd2 fd1;
+  Unix.close fd2
+;;
+
 (* unmarshal from a mmap seen as a bigarray *)
 let unmarshal fd =
  let a=Bigarray.Array1.map_file fd Bigarray.char Bigarray.c_layout true (-1) in
@@ -111,6 +122,9 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
 	begin    
           let d=Unix.gettimeofday() and pid = Unix.getpid() in
           let reschunk=ref opid in
+          (* send stdout and stderr to a file to avoid mixing output from different cores *)
+	  reopen_out stdout (Printf.sprintf "stdout.%d" i);
+	  reopen_out stderr (Printf.sprintf "stderr.%d" i);
           let (ic,oc)=Unix.open_connection sockaddr in
           let finish () = try Unix.shutdown_connection ic with _ -> (); exit 0 in 
 	  while true do
