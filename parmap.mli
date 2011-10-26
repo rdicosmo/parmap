@@ -20,7 +20,7 @@ type 'a sequence = L of 'a list | A of 'a array;;
 
 (** {6 Parallel mapfold} *)
 
-val parmapfold : ?ncores:int -> ('a -> 'b) -> 'a sequence -> ('b-> 'c -> 'c) -> 'c -> ('c->'c->'c) -> 'c
+val parmapfold : ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a sequence -> ('b-> 'c -> 'c) -> 'c -> ('c->'c->'c) -> 'c
 
   (** [parmapfold ~ncores:n f (L l) op b concat ] computes [List.fold_right op (List.map f l) b] 
       by forking [n] processes on a multicore machine. 
@@ -32,7 +32,7 @@ val parmapfold : ?ncores:int -> ('a -> 'b) -> 'a sequence -> ('b-> 'c -> 'c) -> 
       *)
 
 (** {6 Parallel fold} *)
-val parfold: ?ncores:int -> ('a -> 'b -> 'b) -> 'a sequence -> 'b -> ('b->'b->'b) -> 'b
+val parfold: ?ncores:int -> ?chunksize:int -> ('a -> 'b -> 'b) -> 'a sequence -> 'b -> ('b->'b->'b) -> 'b
   (** [parfold ~ncores:n op (L l) b concat] computes [List.fold_right op l b] 
       by forking [n] processes on a multicore machine.
       You need to provide the extra [concat] operator to combine the partial results of the
@@ -44,7 +44,7 @@ val parfold: ?ncores:int -> ('a -> 'b -> 'b) -> 'a sequence -> 'b -> ('b->'b->'b
 
 (** {6 Parallel map} *)
 
-val parmap : ?ncores:int -> ('a -> 'b) -> 'a sequence -> 'b list
+val parmap : ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a sequence -> 'b list
   (** [parmap  ~ncores:n f (L l) ] computes [List.map f l] 
       by forking [n] processes on a multicore machine.
       [parmap  ~ncores:n f (A a) ] computes [Array.map f a] 
