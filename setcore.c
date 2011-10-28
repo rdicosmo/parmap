@@ -6,16 +6,25 @@
 #include <caml/mlvalues.h>
 
 CAMLprim value setcore(value which) {
-  int numCPU = sysconf( _SC_NPROCESSORS_ONLN );
-  int w = Int_val(which) % numCPU; // stay in the space of existing cores
+  int numcores = sysconf( _SC_NPROCESSORS_ONLN );
+  int w = Int_val(which) % numcores; // stay in the space of existing cores
   cpu_set_t cpus;   
-  int retcode; 
-  fprintf(stderr,"pinning to cpu %d out of %d\n",w,numCPU);
-  CPU_ZERO(&cpus); 
-  CPU_SET (which,&cpus);
-  retcode = sched_setaffinity(getpid(), sizeof(cpu_set_t), &cpus);
-  if(retcode != 0) {
-    fprintf(stderr,"error in pinning to cpu %d",w); 
-  }
+  int retcode;
+  int finished=0;
+  while (finished==0)
+    {
+      CPU_ZERO(&cpus); 
+      CPU_SET (w,&cpus);
+      fprintf(stderr,"Trying to pin to cpu %d out of %d reported by the system\n",w,numcores);
+      retcode = sched_setaffinity(getpid(), sizeof(cpu_set_t), &cpus);
+      if(retcode != 0) {
+	fprintf(stderr,"Failed pinning to cpu %d, trying %d/2\n",w, w); 
+	w=w/2;
+      }
+      else 
+	{ fprintf(stderr,"Succeeded pinning to cpu %d\n",w); 
+	  finished=1;
+	}
+    }
   return Val_unit;
 }
