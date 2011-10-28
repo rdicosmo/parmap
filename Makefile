@@ -1,7 +1,7 @@
 NAME = parmap
-OBJS = bytearray $(NAME)
+OBJS = bytearray setcore $(NAME)
 INTF = $(foreach obj, $(OBJS),$(obj).cmi)
-C_OBJS = bytearray_stubs.o
+C_OBJS = bytearray_stubs.o setcore.o
 OBJECTS  = $(foreach obj, $(OBJS),$(obj).cmo)
 XOBJECTS = $(foreach obj, $(OBJS),$(obj).cmx)
 LIBS = $(NAME).cma $(NAME).cmxa $(NAME).cmxs
@@ -38,6 +38,9 @@ $(SARCHIVE): $(INTF) $(XOBJECTS) $(C_OBJS)
 
 bytearray_stubs.o: bytearray_stubs.c
 	ocamlc -c bytearray_stubs.c
+
+setcore.o: setcore.c
+	ocamlc -c -cc "gcc -D_GNU_SOURCE -o setcore.o -fPIC" setcore.c
 
 .SUFFIXES: .cmo .cmi .cmx .ml .mli
 

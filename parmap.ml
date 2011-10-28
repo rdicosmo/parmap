@@ -111,6 +111,7 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
       0 -> 
 	begin    
           let d=Unix.gettimeofday() and pid = Unix.getpid() in
+          Setcore.setcore i;
           let reschunk=ref opid in
           (* send stdout and stderr to a file to avoid mixing output from different cores *)
 	  reopen_out stdout (Printf.sprintf "stdout.%d" i);

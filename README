@@ -48,6 +48,15 @@ very wierd way: as an example, *do  not* open a  graphic window before calling a
 Parmap primitive, and   *do   not*  use  this  library   if  your  program    is
 multi-threaded!
 
+Pinning processes to physical CPUs
+----------------------------------
+
+To obtain maximum  speed,  Parmap tries to  pin  the worker processes to  a CPU,
+using  the scheduler  affinity  interface  that is  available   in recent  Linux
+kernels.   Similar functionality may be  obtained  on different platforms  using
+slightly different API. Contributions  are welcome to  support those other APIs,
+just make sure that you use autoconf properly.
+
 Using Parmap with Ocamlnat
 --------------------------
 
