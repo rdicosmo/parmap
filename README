@@ -23,9 +23,9 @@ your extra cores, when handling some heavy computational load.
 The principle of parmap is very simple: when you call one of the three available
 primitives, map, fold, and  mapfold , your OCaml  sequential program forks  in n
 subprocesses (you choose the n), and each subprocess performs the computation on
-the  1/n of the data, returing  the results through a  shared memory area to the
-parent process, that resumes  execution once all  the children  have terminated,
-and the data has been recollected.
+the 1/n of the data, in chunks  of a size you  can choose, returning the results
+through a shared memory area to the  parent process, that resumes execution once
+all the children have terminated, and the data has been recollected.
 
 You need  to run your  program on a single multicore  machine;  repeat after me:
 Parmap  is   not meant to   run  on a cluster,  see   one of the  many available
@@ -48,3 +48,19 @@ very wierd way: as an example, *do  not* open a  graphic window before calling a
 Parmap primitive, and   *do   not*  use  this  library   if  your  program    is
 multi-threaded!
 
+Using Parmap with Ocamlnat
+--------------------------
+
+You can use Parmap in a native toplevel  (it may be quite useful  if you use the
+native toplevel to perform fast interactive computations), but remember that you
+need to load the .cmxs modules in it; an example is given in example/topnat.ml
+
+Preservation of output order in Parmap
+--------------------------------------
+
+To  gain  speed, Parmap does  not  try to reorder   the chunks of data  that are
+computed by each worker, so the result of  Parmap.parmap f l are not necessarily
+in the same order as List.map f l.
+
+If maintaining such  ordering  is important for  you,   you may use  the  Parmap
+version tagged in the git history as LastVersionBeforeTaskDispatcher.

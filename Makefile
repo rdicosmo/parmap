@@ -1,20 +1,21 @@
 NAME = parmap
 OBJS = $(NAME)
 INTF = $(foreach obj, $(OBJS),$(obj).cmi)
-C_OBJS = ba_marshal_stubs
 OBJECTS  = $(foreach obj, $(OBJS),$(obj).cmo)
 XOBJECTS = $(foreach obj, $(OBJS),$(obj).cmx)
-LIBS = $(NAME).cma $(NAME).cmxa
+LIBS = $(NAME).cma $(NAME).cmxa $(NAME).cmxs
 OCAMLC   = ocamlfind ocamlc -annot
 OCAMLOPT = ocamlfind ocamlopt -annot
+OCAMLMKLIB = ocamlmklib
 OCAMLDEP = ocamldep
 
 ARCHIVE  = $(NAME).cma
 XARCHIVE = $(NAME).cmxa
+SARCHIVE = $(NAME).cmxs
 
 REQUIRES = extlib unix bigarray 
 
-all: $(ARCHIVE) $(XARCHIVE) 
+all: $(ARCHIVE) $(XARCHIVE) $(SARCHIVE)
 
 .PHONY: install
 install: $(LIBS) META
@@ -25,10 +26,14 @@ install: $(LIBS) META
 uninstall:
 	ocamlfind remove $(NAME)
 
-$(ARCHIVE): $(OBJECTS)
-	$(OCAMLC) -a -o $(ARCHIVE) -package "$(REQUIRES)" $(OBJECTS)
-$(XARCHIVE): $(XOBJECTS)
-	$(OCAMLOPT) -a -o $(XARCHIVE) -package "$(REQUIRES)" $(XOBJECTS)
+$(ARCHIVE): $(INTF) $(OBJECTS)
+	$(OCAMLMKLIB) -o $(NAME) $(OBJECTS)
+
+$(XARCHIVE): $(INTF) $(XOBJECTS)
+	$(OCAMLMKLIB) -o $(NAME) $(XOBJECTS)
+
+$(SARCHIVE): $(INTF) $(XOBJECTS)
+	$(OCAMLOPT) -shared -o $(SARCHIVE) $(XOBJECTS)
 
 .SUFFIXES: .cmo .cmi .cmx .ml .mli
 
@@ -46,4 +51,4 @@ include .depend
 
 .PHONY: clean
 clean:
-	rm -f *.cmi *.cmo *.cmx *.cma *.cmxa *.a *.o
+	rm -f *.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs *.a *.o *.so *.annot
