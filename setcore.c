@@ -15,14 +15,14 @@ CAMLprim value setcore(value which) {
     {
       CPU_ZERO(&cpus); 
       CPU_SET (w,&cpus);
-      fprintf(stderr,"Trying to pin to cpu %d out of %d reported by the system\n",w,numcores);
+      //fprintf(stderr,"Trying to pin to cpu %d out of %d reported by the system\n",w,numcores);
       retcode = sched_setaffinity(getpid(), sizeof(cpu_set_t), &cpus);
       if(retcode != 0) {
 	fprintf(stderr,"Failed pinning to cpu %d, trying %d/2\n",w, w); 
 	w=w/2;
       }
       else 
-	{ fprintf(stderr,"Succeeded pinning to cpu %d\n",w); 
+	{ //fprintf(stderr,"Succeeded pinning to cpu %d\n",w); 
 	  finished=1;
 	}
     }

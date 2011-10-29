@@ -11,6 +11,7 @@
 (**************************************************************************)
 
 open Graphics;;
+open Utils;;
 
 let n   = 1000;; (* the size of the square screen windows in pixels      *)
 let res = 1000;; (* the resolution: maximum number of iterations allowed *)
@@ -85,35 +86,11 @@ let tasks =
 
 let draw res =
   open_graph (" "^(string_of_int n)^"x"^(string_of_int n));
-  List.iter show_a_result res; close_graph();;
+  List.iter show_a_result res;;
 
 (* compute the image *)
 
-let tseq,m=
-  let d=Unix.gettimeofday() in
-  let res = (List.map pixel tasks) in
-  (Unix.gettimeofday() -. d),res
-;;
-
-Printf.printf "Sequential time: %f\n" tseq;;
-
-let scale_test iter tseq nprocmin nprocmax =
-Printf.eprintf "Testing scalability with %d iterations on %d*2 to %d*2 cores\n" iter nprocmin nprocmax;
-  for i = nprocmin to nprocmax do
-    let tot=ref 0.0 in
-    for j=1 to iter do
-      let d=Unix.gettimeofday() in
-      ignore(Parmap.parmap  ~ncores:i pixel (Parmap.L tasks));
-      tot:=!tot+.(Unix.gettimeofday()-.d)
-    done;
-    let speedup=tseq /. (!tot /. (float iter)) in 
-    Printf.eprintf "Speedup with %d cores (average on %d iterations): %f (tseq=%f, tpar=%f)\n" (i*2) iter speedup tseq (!tot /. (float iter))
-  done
-;;
-
-scale_test 2 tseq 1 4;;
-
+let m=scale_test ~inorder:false pixel (Parmap.L tasks) 2 1 8;;
 draw m;;
-
 ignore(input_line stdin);;
-
+close_graph();;

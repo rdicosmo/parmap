@@ -11,6 +11,7 @@
 (**************************************************************************)
 
 open Parmap
+open Utils
 
 let initsegm n = let rec aux acc = function 0 -> acc | n -> aux (n::acc) (n-1) in aux [] n
 ;;
@@ -23,27 +24,5 @@ let compute p =
   !r
 ;;
 
-let scale_test iter nprocmin nprocmax =
-  Printf.eprintf "Testing scalability with %d iterations on %d*2 to %d*2 cores\n" iter nprocmin nprocmax;
-  let l = initsegm 20000 in
-  let cl,tseq =  
-    let d=Unix.gettimeofday() in
-    let l' = List.map compute l
-    in l',(Unix.gettimeofday() -. d)
-  in
-  Printf.eprintf "Sequential execution takes %f seconds\n" tseq;
-  for i = nprocmin to nprocmax do
-    let tot=ref 0.0 in
-    for j=1 to iter do
-      let d=Unix.gettimeofday() in
-      let cl'=parmap ~ncores:(i*2) compute (L l) in
-      tot:=!tot+.(Unix.gettimeofday()-.d);
-      if cl<>cl' then Printf.eprintf "Parmap failure: result mismatch\n"
-    done;
-    let speedup=tseq /. (!tot /. (float iter)) in 
-    Printf.eprintf "Speedup with %d cores (average on %d iterations): %f (tseq=%f, tpar=%f)\n" (i*2) iter speedup tseq (!tot /. (float iter))
-  done
-;;
-
-scale_test 2 1 10;;
+scale_test compute (A (Array.of_list (initsegm 20000))) 2 1 10;;
 
