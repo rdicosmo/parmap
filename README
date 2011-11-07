@@ -58,9 +58,16 @@ need to load the .cmxs modules in it; an example is given in example/topnat.ml
 Preservation of output order in Parmap
 --------------------------------------
 
-To  gain  speed, Parmap does  not  try to reorder   the chunks of data  that are
-computed by each worker, so the result of  Parmap.parmap f l are not necessarily
-in the same order as List.map f l.
+If the number of chunks is equal to the number of cores, it is easy to preserve
+the order of the elements of the sequence passed to the map/fold operations, so
+the result will be a list with the same order as if the sequential function would
+be applied to the input. This is what the parmap, parmafold and parfold functions
+do when the chunksize argument is not used.
 
-If maintaining such  ordering  is important for  you,   you may use  the  Parmap
-version tagged in the git history as LastVersionBeforeTaskDispatcher.
+If the user specifies a chunksize that is different from the number of cores,
+there is no general way to preserve the ordering, so the result of calling
+Parmap.parmap f l are not necessarily in the same order as List.map f l.
+
+In general, using little chunksize helps in balancing the load among the workers,
+and provides better speed, at the price of losing the ordering: there is a
+tradeoff, and it is up to the user to choose the solution that better suits him/her.

@@ -83,7 +83,7 @@ type 'a sequence = L of 'a list | A of 'a array;;
 
 (* the type of messages exchanged between master and workers *)
 
-type msg = Ready | Finished | Task of int | Error of int * string;;
+type msg = Ready of int | Finished | Task of int | Error of int * string;;
 
 (* the core parallel mapfold function *)
 
@@ -120,7 +120,7 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
 	  while true do
             (* ask for work until we are finished *)
 	    if debug then Printf.eprintf "Sending Ready token (pid=%d)\n%!" pid;
-            Marshal.to_channel oc Ready []; flush oc;
+            Marshal.to_channel oc (Ready i) []; flush oc;
             let token = (Marshal.from_channel ic) in
 	    if debug then Printf.eprintf "Received token from master (pid=%d)\n%!" pid;
             match token with
@@ -159,14 +159,16 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
       (ext_intv 0 (ncores-1))
   in
   (* feed workers until all tasks are finished *)
+  (* in case ntasks=ncores, we can easily preserve the ordering *)
+  let tasksel = if ntasks=ncores then fst else snd in
   for i=0 to ntasks-1 do
-    if debug then Printf.eprintf "Select for task %d\n%!" i;
+    if debug then Printf.eprintf "Select for task %d (ncores=%d, ntasks=%d)\n%!" i ncores ntasks;
     let (wfd::_),_,_ = Unix.select wfdl [] [] (-1.)
     in match Marshal.from_channel (Unix.in_channel_of_descr wfd) with
-      Ready -> 
-	(if debug then Printf.eprintf "Sending task %d\n%!" i;
+      Ready w -> 
+	(if debug then Printf.eprintf "Sending task %d to worker %d\n%!" (tasksel (w,i)) w;
          let oc = (Unix.out_channel_of_descr wfd) in
-	 (Marshal.to_channel oc (Task i) []); flush oc)
+	 (Marshal.to_channel oc (Task (tasksel(w,i))) []); flush oc)
     | Error (core,msg) -> (Printf.eprintf "[Parmap]: aborting due to exception on core %d: %s\n" core msg; exit 1)
     (* will need to add some code to properly close down all the channels incrementally *)
   done;
