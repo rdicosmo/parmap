@@ -1,6 +1,6 @@
 NAME = parmap
-OBJS = bytearray setcore $(NAME)
-INTF = $(foreach obj, $(OBJS),$(obj).cmi)
+OBJS = bytearray $(NAME)
+INTF = $(foreach obj, $(OBJS),$(obj).cmi) setcore.cmi
 C_OBJS = bytearray_stubs.o setcore.o
 OBJECTS  = $(foreach obj, $(OBJS),$(obj).cmo)
 XOBJECTS = $(foreach obj, $(OBJS),$(obj).cmx)
