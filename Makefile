@@ -1,12 +1,13 @@
 NAME = parmap
-OBJS = $(NAME)
+OBJS = bytearray $(NAME)
 INTF = $(foreach obj, $(OBJS),$(obj).cmi)
+C_OBJS = bytearray_stubs.o
 OBJECTS  = $(foreach obj, $(OBJS),$(obj).cmo)
 XOBJECTS = $(foreach obj, $(OBJS),$(obj).cmx)
 LIBS = $(NAME).cma $(NAME).cmxa $(NAME).cmxs
 OCAMLC   = ocamlfind ocamlc -annot
 OCAMLOPT = ocamlfind ocamlopt -annot
-OCAMLMKLIB = ocamlmklib -verbose
+OCAMLMKLIB = ocamlmklib
 OCAMLDEP = ocamldep
 
 ARCHIVE  = $(NAME).cma
@@ -20,20 +21,23 @@ all: $(ARCHIVE) $(XARCHIVE) $(SARCHIVE)
 .PHONY: install
 install: $(LIBS) META
 	ocamlfind remove $(NAME)
-	ocamlfind install $(NAME) META $(INTF) $(LIBS) *.a *.mli
+	ocamlfind install $(NAME) META $(INTF) $(LIBS) *.a *.mli $(C_OBJS)
 
 .PHONY: uninstall
 uninstall:
 	ocamlfind remove $(NAME)
 
-$(ARCHIVE): $(INTF) $(OBJECTS)
-	$(OCAMLC) -a -o $(NAME).cma $(OBJECTS)
+$(ARCHIVE): $(INTF) $(OBJECTS) $(C_OBJS) 
+	$(OCAMLMKLIB) -o $(NAME) $(OBJECTS) $(C_OBJS)
 
-$(XARCHIVE): $(INTF) $(XOBJECTS)
-	$(OCAMLOPT) -a -o $(NAME).cmxa $(XOBJECTS)
+$(XARCHIVE): $(INTF) $(XOBJECTS) $(C_OBJS)
+	$(OCAMLMKLIB) -o $(NAME) $(XOBJECTS) $(C_OBJS)
 
-$(SARCHIVE): $(INTF) $(XOBJECTS)
-	$(OCAMLOPT) -shared -o $(SARCHIVE) $(XOBJECTS)
+$(SARCHIVE): $(INTF) $(XOBJECTS) $(C_OBJS)
+	$(OCAMLOPT) -shared -o $(SARCHIVE) $(C_OBJS) $(XOBJECTS)
+
+bytearray_stubs.o: bytearray_stubs.c
+	ocamlc -c bytearray_stubs.c
 
 .SUFFIXES: .cmo .cmi .cmx .ml .mli
 

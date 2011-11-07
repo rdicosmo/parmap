@@ -36,26 +36,17 @@ let reopen_out outchan filename =
 (* unmarshal from a mmap seen as a bigarray *)
 let unmarshal fd =
  let a=Bigarray.Array1.map_file fd Bigarray.char Bigarray.c_layout true (-1) in
- let read_mmap ofs len = 
-   let s = String.make len ' ' in
-   for k = 0 to len-1 do s.[k]<-a.{ofs+k} done;
-   s
- in
- (* read the header *)
- let s = read_mmap 0 Marshal.header_size in
- let size=Marshal.total_size s 0 in
- let s' = read_mmap 0 size in
- Unix.close fd;
- Marshal.from_string s' 0
+ let res=Bytearray.unmarshal a 0 in
+ Unix.close fd; 
+ res
 
 
 (* marshal to a mmap seen as a bigarray *)
 
 let marshal pid fd v = 
-  let s = Marshal.to_string v [Marshal.Closures] in
-  let sl = (String.length s) in
-  let ba = Bigarray.Array1.map_file fd Bigarray.char Bigarray.c_layout true sl in
-  for k = 0 to sl-1 do ba.{k} <-s.[k] done;
+  let huge_size = 1 lsl 32 in
+  let ba = Bigarray.Array1.map_file fd Bigarray.char Bigarray.c_layout true huge_size in
+  ignore(Bytearray.marshal_to_buffer ba 0 v [Marshal.Closures]);
   Unix.close fd
 
 (* create a shadow file descriptor *)

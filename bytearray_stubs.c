@@ -21,8 +21,8 @@ CAMLprim value ml_marshal_to_bigarray_buffer(value b, value ofs,
                                              value v, value flags)
 {
   struct caml_bigarray *b_arr = Bigarray_val(b);
-  return caml_output_value_to_block(v, flags, Array_data (b_arr, ofs),
-                                    b_arr->dim[0] - Long_val(ofs));
+  return Val_long(caml_output_value_to_block(v, flags, Array_data (b_arr, ofs),
+					     b_arr->dim[0] - Long_val(ofs)));
 }
 
 

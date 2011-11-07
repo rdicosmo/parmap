@@ -23,3 +23,5 @@ val prefix : t -> t -> int -> bool
 val marshal : 'a -> Marshal.extern_flags list -> t
 
 val unmarshal : t -> int -> 'a
+
+val marshal_to_buffer : t -> int -> 'a -> Marshal.extern_flags list -> int
