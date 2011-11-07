@@ -6,7 +6,7 @@ XOBJECTS = $(foreach obj, $(OBJS),$(obj).cmx)
 LIBS = $(NAME).cma $(NAME).cmxa $(NAME).cmxs
 OCAMLC   = ocamlfind ocamlc -annot
 OCAMLOPT = ocamlfind ocamlopt -annot
-OCAMLMKLIB = ocamlmklib
+OCAMLMKLIB = ocamlmklib -verbose
 OCAMLDEP = ocamldep
 
 ARCHIVE  = $(NAME).cma
@@ -27,10 +27,10 @@ uninstall:
 	ocamlfind remove $(NAME)
 
 $(ARCHIVE): $(INTF) $(OBJECTS)
-	$(OCAMLMKLIB) -o $(NAME) $(OBJECTS)
+	$(OCAMLC) -a -o $(NAME).cma $(OBJECTS)
 
 $(XARCHIVE): $(INTF) $(XOBJECTS)
-	$(OCAMLMKLIB) -o $(NAME) $(XOBJECTS)
+	$(OCAMLOPT) -a -o $(NAME).cmxa $(XOBJECTS)
 
 $(SARCHIVE): $(INTF) $(XOBJECTS)
 	$(OCAMLOPT) -shared -o $(SARCHIVE) $(XOBJECTS)
