@@ -38,7 +38,12 @@ let scale_test iter nprocmin nprocmax =
       let d=Unix.gettimeofday() in
       let cl'=parmap ~ncores:(i*2) compute (L l) in
       tot:=!tot+.(Unix.gettimeofday()-.d);
-      if cl<>cl' then Printf.eprintf "Parmap failure: result mismatch\n"
+      if cl<>cl' then 
+	begin
+	  if (List.sort compare cl) <> (List.sort compare cl') then 
+	    Printf.eprintf "Parmap failure: result mismatch\n"
+	  else Printf.eprintf "Parmap warning: results are out of order\n"
+	end
     done;
     let speedup=tseq /. (!tot /. (float iter)) in 
     Printf.eprintf "Speedup with %d cores (average on %d iterations): %f (tseq=%f, tpar=%f)\n" (i*2) iter speedup tseq (!tot /. (float iter))
