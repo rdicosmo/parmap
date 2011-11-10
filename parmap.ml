@@ -15,12 +15,23 @@ open ExtLib
 
 let debug=false;;
 
-(* utils; would disappear if we use list comprehension from Batteries *)
+(* utils *)
+
+(* would be [? a | a <- startv--endv] using list comprehension from Batteries *)
 
 let ext_intv startv endv =
   let s,e = (min startv endv),(max startv endv) in
   let rec aux acc = function n -> if n=s then n::acc else aux (n::acc) (n-1)
   in aux [] e
+;;
+
+(* find index of the first occurrence of an element in a list *)
+
+let index_of e l =
+  let rec aux = function
+      ([],_) -> raise Not_found
+    | (a::r,n) -> if a=e then n else aux (r,n+1)
+  in aux (l,0)
 ;;
 
 (* freopen emulation, from Xavier's suggestion on OCaml mailing list *)
@@ -59,26 +70,6 @@ let tempfd () =
     fd
   with e -> Unix.unlink name; raise e
 
-(* setup a service on a free port *)
-
-let setup_server quesize = 
-  let sock = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
-  Unix.setsockopt sock Unix.SO_REUSEADDR true;
-  Unix.setsockopt sock Unix.SO_KEEPALIVE true;
-  (* no need yet to perform tuning at this level
-    Unix.setsockopt_int sock Unix.SO_SNDBUF 1000;
-    Unix.setsockopt_int sock Unix.SO_RCVBUF 1000;
-   *)
-  let sockaddr = Unix.ADDR_INET (Unix.inet_addr_any, 0) in (* using zero here forces the system to provide a free port *)
-  Unix.bind sock sockaddr;
-  Unix.listen sock quesize;
-  let sockaddr = Unix.getsockname sock in (* get back the address with the chosen port *)
-  let port = match sockaddr with
-  | Unix.ADDR_INET(_,x) -> x | _ -> assert false
-  in (sock, sockaddr, port)
-;;
-
-
 type 'a sequence = L of 'a list | A of 'a array;;
 
 (* the type of messages exchanged between master and workers *)
@@ -105,7 +96,8 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
   in
   let fdarr=Array.init ncores (fun _ -> tempfd()) in
   (* setup communication channel with the workers *)
-  let sock, sockaddr, port = setup_server ncores in
+  let pipedown=Array.init ncores (fun _ -> Unix.pipe ()) in
+  let pipeup=Array.init ncores (fun _ -> Unix.pipe ()) in
   for i = 0 to ncores-1 do
        match Unix.fork() with
       0 -> 
@@ -116,8 +108,11 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
           (* send stdout and stderr to a file to avoid mixing output from different cores *)
 	  reopen_out stdout (Printf.sprintf "stdout.%d" i);
 	  reopen_out stderr (Printf.sprintf "stderr.%d" i);
-          let (ic,oc)=Unix.open_connection sockaddr in
-          let finish () = try Unix.shutdown_connection ic with _ -> (); exit 0 in 
+          (* close the other ends of the pipe and convert my ends to ic/oc *)
+          Unix.close (snd pipedown.(i));Unix.close (fst pipeup.(i));
+          let ic = Unix.in_channel_of_descr (fst pipedown.(i))
+          and oc = Unix.out_channel_of_descr (snd pipeup.(i)) in
+          let finish () = try close_in ic; close_out oc with _ -> (); exit 0 in 
 	  while true do
             (* ask for work until we are finished *)
 	    if debug then Printf.eprintf "Sending Ready token (pid=%d)\n%!" pid;
@@ -148,37 +143,33 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
     | -1 ->  Printf.eprintf "[Parmap] Fork error: pid %d; i=%d.\n" (Unix.getpid()) i; 
     | pid -> ()
   done;
-  (* get all connections from the workers *)
-  let wfdl = 
-    List.map 
-      (fun i -> 
-	let (fd,saddr) = 
-	  try Unix.accept sock 
-	  with e -> (Printf.eprintf "[Parmap] error accepting connection from worker %i\n%!" i; 
-		     raise e) 
-	in (if debug then Printf.eprintf "[Parmap] accepted connection from worker %d\n%!" i; fd))
-      (ext_intv 0 (ncores-1))
-  in
+  (* close unused ends of the pipes *)
+  Array.iter (fun (rfd,_) -> Unix.close rfd) pipedown;
+  Array.iter (fun (_,wfd) -> Unix.close wfd) pipeup;
+  (* get ic/oc/wfdl *)
+  let wfdl = List.map fst (Array.to_list pipeup) in
+  let ocs=Array.init ncores (fun n -> Unix.out_channel_of_descr (snd pipedown.(n))) in
+  let ics=Array.init ncores (fun n -> Unix.in_channel_of_descr (fst pipeup.(n))) in
+
   (* feed workers until all tasks are finished *)
-  (* in case ntasks=ncores, we can easily preserve the ordering *)
+
+  (* in case ntasks=ncores, preserve the ordering *)
   let tasksel = if ntasks=ncores then fst else snd in
+
   for i=0 to ntasks-1 do
     if debug then Printf.eprintf "Select for task %d (ncores=%d, ntasks=%d)\n%!" i ncores ntasks;
-    let (wfd::_),_,_ = Unix.select wfdl [] [] (-1.)
-    in match Marshal.from_channel (Unix.in_channel_of_descr wfd) with
+    let (wfd::_),_,_ = Unix.select wfdl [] [] (-1.) in
+    let w=index_of wfd wfdl
+    in match Marshal.from_channel ics.(w) with
       Ready w -> 
 	(if debug then Printf.eprintf "Sending task %d to worker %d\n%!" (tasksel (w,i)) w;
-         let oc = (Unix.out_channel_of_descr wfd) in
+         let oc = ocs.(w) in
 	 (Marshal.to_channel oc (Task (tasksel(w,i))) []); flush oc)
     | Error (core,msg) -> (Printf.eprintf "[Parmap]: aborting due to exception on core %d: %s\n" core msg; exit 1)
-    (* will need to add some code to properly close down all the channels incrementally *)
   done;
   
-  List.iter 
-	(fun wfd -> 
-	  let oc = (Unix.out_channel_of_descr wfd) 
-          in Marshal.to_channel oc Finished []; flush oc; Unix.close wfd
-	) wfdl;
+  (* send termination token to all childrens *)
+  Array.iter (fun oc -> Marshal.to_channel oc Finished []; flush oc; close_out oc) ocs;
   
   (* wait for all childrens to terminate *)
   for i = 0 to ncores-1 do try ignore(Unix.wait()) with Unix.Unix_error (Unix.ECHILD, _, _) -> () done;
