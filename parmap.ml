@@ -195,7 +195,7 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
 (* the parallel map function *)
 
 let parmap ?(ncores=1) ?chunksize (f:'a -> 'b) (s:'a sequence) : 'b list=
-    parmapfold ~ncores ?chunksize f s (fun v acc -> v::acc) [] (@) 
+    parmapfold ~ncores ?chunksize f s (fun v acc -> v::acc) [] (ExtLib.List.append) 
 ;;
 
 (* the parallel fold function *)
