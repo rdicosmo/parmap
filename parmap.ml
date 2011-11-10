@@ -174,7 +174,11 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
     (* will need to add some code to properly close down all the channels incrementally *)
   done;
   
-  List.iter (fun wfd -> let oc = (Unix.out_channel_of_descr wfd) in (Marshal.to_channel oc Finished []; flush oc; Unix.close wfd)) wfdl;
+  List.iter 
+	(fun wfd -> 
+	  let oc = (Unix.out_channel_of_descr wfd) 
+          in Marshal.to_channel oc Finished []; flush oc; Unix.close wfd
+	) wfdl;
   
   (* wait for all childrens to terminate *)
   for i = 0 to ncores-1 do try ignore(Unix.wait()) with Unix.Unix_error (Unix.ECHILD, _, _) -> () done;
