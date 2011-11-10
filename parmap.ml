@@ -112,7 +112,7 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
           Unix.close (snd pipedown.(i));Unix.close (fst pipeup.(i));
           let ic = Unix.in_channel_of_descr (fst pipedown.(i))
           and oc = Unix.out_channel_of_descr (snd pipeup.(i)) in
-          let finish () = try close_in ic; close_out oc with _ -> (); exit 0 in 
+          let finish () = (try close_in ic; close_out oc with _ -> ()); exit 0 in 
 	  while true do
             (* ask for work until we are finished *)
 	    if debug then Printf.eprintf "Sending Ready token (pid=%d)\n%!" pid;
@@ -120,7 +120,7 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
             let token = (Marshal.from_channel ic) in
 	    if debug then Printf.eprintf "Received token from master (pid=%d)\n%!" pid;
             match token with
-	    | Finished -> (marshal pid fdarr.(i) (!reschunk:'d); finish ())
+	    | Finished -> ( if debug then Printf.eprintf "Shutting down (pid=%d)\n%!" pid; marshal pid fdarr.(i) (!reschunk:'d); finish ())
 	    | Task i -> 
 		let lo=i*chunksize in
 		let hi=if i=ntasks-1 then ln-1 else (i+1)*chunksize-1 in
