@@ -90,7 +90,14 @@ let draw res =
 
 (* compute the image *)
 
-let m=scale_test ~inorder:false pixel (Parmap.L tasks) 2 1 8;;
+Printf.printf "*** Testing with coarse granularity\n";;
+let m=scale_test pixel (Parmap.L tasks) 2 1 8;;
+
+Printf.printf "*** Testing with chunksize=1\n";;
+let m=scale_test ~inorder:false ~chunksize:1 pixel (Parmap.L tasks) 2 1 8;;
+
+(* draw the image *)
+
 draw m;;
 ignore(input_line stdin);;
 close_graph();;
