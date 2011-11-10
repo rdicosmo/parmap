@@ -89,29 +89,13 @@ let draw res =
 
 (* compute the image *)
 
-let tseq,m=
-  let d=Unix.gettimeofday() in
-  let res = (List.map pixel tasks) in
-  (Unix.gettimeofday() -. d),res
-;;
+Printf.printf "*** Testing with coarse granularity\n";;
+let m=scale_test pixel (Parmap.L tasks) 2 1 8;;
 
-Printf.printf "Sequential time: %f\n" tseq;;
+Printf.printf "*** Testing with chunksize=1\n";;
+let m=scale_test ~inorder:false ~chunksize:1 pixel (Parmap.L tasks) 2 1 8;;
 
-let scale_test iter tseq nprocmin nprocmax =
-Printf.eprintf "Testing scalability with %d iterations on %d*2 to %d*2 cores\n" iter nprocmin nprocmax;
-  for i = nprocmin to nprocmax do
-    let tot=ref 0.0 in
-    for j=1 to iter do
-      let d=Unix.gettimeofday() in
-      ignore(Parmap.parmap  ~ncores:i pixel (Parmap.L tasks));
-      tot:=!tot+.(Unix.gettimeofday()-.d)
-    done;
-    let speedup=tseq /. (!tot /. (float iter)) in 
-    Printf.eprintf "Speedup with %d cores (average on %d iterations): %f (tseq=%f, tpar=%f)\n" (i*2) iter speedup tseq (!tot /. (float iter))
-  done
-;;
-
-scale_test 2 tseq 1 4;;
+(* draw the image *)
 
 draw m;;
 
