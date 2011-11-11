@@ -90,7 +90,7 @@ let parmapfold ?(ncores=1) (f:'a -> 'b) (s:'a sequence) (op:'b->'c->'c) (opid:'c
           (* iterate in reverse order, to accumulate in the right order *)
           for j=0 to (hi-lo) do
 	    try 
-              reschunk := op (f (al.(hi-j))) !reschunk
+	      reschunk := op (f (Array.unsafe_get al (hi-j))) !reschunk;
 	    with e -> (Printf.printf "Error: at index j=%d got exception %s\n" j (Printexc.to_string e))
           done;
 	  marshal pid fdarr.(i) (!reschunk:'d);
