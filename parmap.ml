@@ -127,7 +127,7 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
 		(* iterate in reverse order, to accumulate in the right order *)
 		for j=0 to (hi-lo) do
 		  try 
-		    reschunk := op (f (al.(hi-j))) !reschunk;
+		    reschunk := op (f (Array.unsafe_get al (hi-j))) !reschunk;
 		  with e -> 
 		    begin
 		      let errmsg = Printexc.to_string e
