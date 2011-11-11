@@ -1,7 +1,10 @@
-all: simplescale.native simplescale_array.native simplescalefold.native simplescalemapfold.native mandels.native
+all: simplescale.native floatscale.native simplescale_array.native simplescalefold.native simplescalemapfold.native mandels.native
 
 simplescale.native: utils.ml simplescale.ml
 	ocamlfind ocamlopt -o simplescale.native -package "extlib parmap" -linkpkg utils.ml simplescale.ml
+
+floatscale.native: utils.ml floatscale.ml
+	ocamlfind ocamlopt -o floatscale.native -package "extlib parmap" -linkpkg utils.ml floatscale.ml
 
 simplescale_array.native: utils.ml simplescale_array.ml
 	ocamlfind ocamlopt -o simplescale_array.native -package "extlib parmap" -linkpkg utils.ml simplescale_array.ml
