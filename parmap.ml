@@ -54,7 +54,7 @@ let unmarshal fd =
 
 (* marshal to a mmap seen as a bigarray *)
 
-let marshal pid fd v = 
+let marshal fd v = 
   let huge_size = 1 lsl 32 in
   let ba = Bigarray.Array1.map_file fd Bigarray.char Bigarray.c_layout true huge_size in
   ignore(Bytearray.marshal_to_buffer ba 0 v [Marshal.Closures]);
@@ -120,7 +120,7 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
             let token = (Marshal.from_channel ic) in
 	    if debug then Printf.eprintf "Received token from master (pid=%d)\n%!" pid;
             match token with
-	    | Finished -> ( if debug then Printf.eprintf "Shutting down (pid=%d)\n%!" pid; marshal pid fdarr.(i) (!reschunk:'d); finish ())
+	    | Finished -> ( if debug then Printf.eprintf "Shutting down (pid=%d)\n%!" pid; marshal fdarr.(i) (!reschunk:'d); finish ())
 	    | Task i -> 
 		let lo=i*chunksize in
 		let hi=if i=ntasks-1 then ln-1 else (i+1)*chunksize-1 in
@@ -193,4 +193,54 @@ let parmap ?(ncores=1) ?chunksize (f:'a -> 'b) (s:'a sequence) : 'b list=
 
 let parfold ?(ncores=1) ?chunksize (op:'a -> 'b -> 'b) (s:'a sequence) (opid:'b) (concat:'b->'b->'b) : 'b=
     parmapfold ~ncores ?chunksize (fun x -> x) s op opid concat
+;;
+
+
+
+(* the parallel map function, specialised on float arrays *)
+
+
+let map_intv lo hi f a =
+  let l = hi-lo in
+  if l < 0 then [||] else begin
+    let r = Array.create (l+1) (f(Array.unsafe_get a lo)) in
+    for i = 1 to l do
+      Array.unsafe_set r i (f(Array.unsafe_get a (lo+i)))
+    done;
+    r
+  end
+
+let array_parmap ?(ncores=1) (f:float -> float) (al:float array) : float array=
+  (* flush everything *)
+  flush stdout; flush stderr;
+  (* init task parameters *)
+  let ln = Array.length al in
+  let chunksize = ln/ncores in
+  let fdarr=Array.init ncores (fun _ -> tempfd()) in
+  for i = 0 to ncores-1 do
+       match Unix.fork() with
+      0 -> 
+	begin
+          let lo=i*chunksize in
+          let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
+	  let res = 
+	    try 
+	      map_intv lo hi f al;
+	    with e -> (Printf.printf "Error: got exception %s\n" (Printexc.to_string e)); raise e
+	  in  marshal fdarr.(i) res;
+          exit 0
+	end
+    | -1 ->  Printf.eprintf "Fork error: pid %d; i=%d.\n" (Unix.getpid()) i; 
+    | pid -> ()
+  done;
+  (* wait for all childrens *)
+  for i = 0 to ncores-1 do try ignore(Unix.wait()) with Unix.Unix_error (Unix.ECHILD, _, _) -> () done;
+  (* read in all data *)
+  let res = ref [] in
+  (* iterate in reverse order, to accumulate in the right order *)
+  for i = 0 to ncores-1 do
+      res:= ((unmarshal fdarr.((ncores-1)-i)):'d)::!res;
+  done;
+  (* use extLib's tail recursive one *)
+  Array.concat !res
 ;;
