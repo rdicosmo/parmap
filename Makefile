@@ -1,7 +1,8 @@
 NAME = parmap
-OBJS = bytearray $(NAME)
+OBJS = bytearray $(NAME) version
 INTF = $(foreach obj, $(OBJS),$(obj).cmi) setcore.cmi
 C_OBJS = bytearray_stubs.o setcore.o
+C_FILES = setcore.c
 OBJECTS  = $(foreach obj, $(OBJS),$(obj).cmo)
 XOBJECTS = $(foreach obj, $(OBJS),$(obj).cmx)
 LIBS = $(NAME).cma $(NAME).cmxa $(NAME).cmxs
@@ -9,6 +10,10 @@ OCAMLC   = ocamlfind ocamlc -annot
 OCAMLOPT = ocamlfind ocamlopt -annot
 OCAMLMKLIB = ocamlmklib
 OCAMLDEP = ocamldep
+
+SOURCES = $(foreach obj, $(OBJS),$(obj).ml) $(C_FILES)
+
+TOOLS = Makefile
 
 ARCHIVE  = $(NAME).cma
 XARCHIVE = $(NAME).cmxa
@@ -41,6 +46,9 @@ bytearray_stubs.o: bytearray_stubs.c
 
 setcore.o: setcore.c
 	ocamlc -c -cc "gcc -D_GNU_SOURCE -o setcore.o -fPIC" setcore.c
+
+version.ml: $(SOURCES) $(TOOLS)
+	echo 'let git_version="'`git rev-parse HEAD`'";;' > version.ml
 
 .SUFFIXES: .cmo .cmi .cmx .ml .mli
 

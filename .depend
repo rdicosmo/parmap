@@ -1,6 +1,12 @@
 bytearray.cmo: bytearray.cmi
 bytearray.cmx: bytearray.cmi
-parmap.cmo: bytearray.cmi parmap.cmi
-parmap.cmx: bytearray.cmx parmap.cmi
+gc.cmo:
+gc.cmx:
+parmap.cmo: version.cmi setcore.cmi bytearray.cmi parmap.cmi
+parmap.cmx: version.cmx setcore.cmi bytearray.cmx parmap.cmi
+version.cmo: version.cmi
+version.cmx: version.cmi
 bytearray.cmi:
 parmap.cmi:
+setcore.cmi:
+version.cmi:

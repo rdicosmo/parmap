@@ -15,6 +15,8 @@ open ExtLib
 
 let debug=false;;
 
+let version=Version.git_version;;
+
 (* utils *)
 
 (* would be [? a | a <- startv--endv] using list comprehension from Batteries *)
