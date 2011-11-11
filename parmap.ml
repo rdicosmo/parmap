@@ -114,7 +114,7 @@ let parmapfold ?(ncores=1) (f:'a -> 'b) (s:'a sequence) (op:'b->'c->'c) (opid:'c
 (* the parallel map function *)
 
 let parmap ?(ncores=1) (f:'a -> 'b) (s:'a sequence) : 'b list=
-    parmapfold f s (fun v acc -> v::acc) [] ~ncores (@) 
+    parmapfold f s (fun v acc -> v::acc) [] ~ncores (List.append) 
 ;;
 
 (* the parallel fold function *)
