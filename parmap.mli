@@ -49,3 +49,9 @@ val parmap : ?ncores:int -> ('a -> 'b) -> 'a sequence -> 'b list
       by forking [n] processes on a multicore machine.
       [parmap  ~ncores:n f (A a) ] computes [Array.map f a] 
       by forking [n] processes on a multicore machine. *)
+
+
+(** {6 Parallel map specialised on float arrays} *)
+
+val array_parmap : ?ncores:int -> (float -> float) -> float array -> float array
+  (** specialised version for float arrays *)

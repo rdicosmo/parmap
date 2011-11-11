@@ -122,3 +122,59 @@ let parmap ?(ncores=1) (f:'a -> 'b) (s:'a sequence) : 'b list=
 let parfold ?(ncores=1) (op:'a -> 'b -> 'b) (s:'a sequence) (opid:'b) (concat:'b->'b->'b) : 'b=
     parmapfold ~ncores (fun x -> x) s op opid concat
 ;;
+
+
+
+(* the parallel map function, specialised on float arrays *)
+
+
+let map_intv lo hi f a =
+  let l = hi-lo in
+  if l < 0 then [||] else begin
+    let r = Array.create (l+1) (f(Array.unsafe_get a lo)) in
+    for i = 1 to l do
+      Array.unsafe_set r i (f(Array.unsafe_get a (lo+i)))
+    done;
+    r
+  end
+
+let array_parmap ?(ncores=1) (f:float -> float) (al:float array) : float array=
+  (* flush everything *)
+  flush stdout; flush stderr;
+  (* init task parameters *)
+  let ln = Array.length al in
+  let chunksize = ln/ncores in
+  let fdarr=Array.init ncores (fun _ -> tempfd()) in
+  for i = 0 to ncores-1 do
+       match Unix.fork() with
+      0 -> 
+	begin
+          let pid = Unix.getpid() in
+(* removed, for speed 
+          (* send stdout and stderr to a file to avoid mixing output from different cores *)
+	  reopen_out stdout (Printf.sprintf "stdout.%d" i);
+	  reopen_out stderr (Printf.sprintf "stderr.%d" i);
+ *)
+          let lo=i*chunksize in
+          let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
+	  let res = 
+	    try 
+	      map_intv lo hi f al;
+	    with e -> (Printf.printf "Error: got exception %s\n" (Printexc.to_string e)); raise e
+	  in  marshal pid fdarr.(i) res;
+          exit 0
+	end
+    | -1 ->  Printf.eprintf "Fork error: pid %d; i=%d.\n" (Unix.getpid()) i; 
+    | pid -> ()
+  done;
+  (* wait for all childrens *)
+  for i = 0 to ncores-1 do try ignore(Unix.wait()) with Unix.Unix_error (Unix.ECHILD, _, _) -> () done;
+  (* read in all data *)
+  let res = ref [] in
+  (* iterate in reverse order, to accumulate in the right order *)
+  for i = 0 to ncores-1 do
+      res:= ((unmarshal fdarr.((ncores-1)-i)):'d)::!res;
+  done;
+  (* use extLib's tail recursive one *)
+  Array.concat !res
+;;
