@@ -13,6 +13,11 @@
 
 open ExtLib
 
+
+(* sequence type, subsuming lists and arrays *)
+
+type 'a sequence = L of 'a list | A of 'a array;;
+
 let debug=false;;
 
 (* utils *)
@@ -69,8 +74,6 @@ let tempfd () =
     Unix.unlink name;
     fd
   with e -> Unix.unlink name; raise e
-
-type 'a sequence = L of 'a list | A of 'a array;;
 
 (* the type of messages exchanged between master and workers *)
 
