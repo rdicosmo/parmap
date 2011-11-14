@@ -74,7 +74,8 @@ type 'a sequence = L of 'a list | A of 'a array;;
 
 (* the type of messages exchanged between master and workers *)
 
-type msg = Ready of int | Finished | Task of int | Error of int * string;;
+type msg_up = Ready of int | Error of int * string;;
+type msg_down = Finished | Task of int;;
 
 (* the core parallel mapfold function *)
 
@@ -158,7 +159,8 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
 
   for i=0 to ntasks-1 do
     if debug then Printf.eprintf "Select for task %d (ncores=%d, ntasks=%d)\n%!" i ncores ntasks;
-    let (wfd::_),_,_ = Unix.select wfdl [] [] (-1.) in
+    let readyl,_,_ = Unix.select wfdl [] [] (-1.) in
+    let wfd=List.hd readyl in (* List.hd never fails here *)
     let w=index_of wfd wfdl
     in match Marshal.from_channel ics.(w) with
       Ready w -> 
@@ -236,7 +238,7 @@ let array_parmap ?(ncores=1) f al =
     | -1 ->  Printf.eprintf "Fork error: pid %d; i=%d.\n" (Unix.getpid()) i; 
     | pid -> ()
   done;
-  (* wait for all childrens *)
+  (* wait for all children *)
   for i = 0 to ncores-1 do try ignore(Unix.wait()) with Unix.Unix_error (Unix.ECHILD, _, _) -> () done;
   (* read in all data *)
   let res = ref [] in

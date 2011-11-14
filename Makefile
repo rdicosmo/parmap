@@ -21,7 +21,7 @@ all: $(ARCHIVE) $(XARCHIVE) $(SARCHIVE)
 .PHONY: install
 install: $(LIBS) META
 	ocamlfind remove $(NAME)
-	ocamlfind install $(NAME) META $(INTF) $(LIBS) *.a *.mli $(C_OBJS)
+	ocamlfind install $(NAME) META $(INTF) $(LIBS) *.a *.mli $(C_OBJS) *.so
 
 .PHONY: uninstall
 uninstall:
