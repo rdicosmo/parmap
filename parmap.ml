@@ -210,7 +210,10 @@ let map_intv lo hi f a =
     r
   end
 
+(*
 let array_parmap ?(ncores=1) (f:float -> float) (al:float array) : float array=
+ *)
+let array_parmap ?(ncores=1) f al =
   (* flush everything *)
   flush stdout; flush stderr;
   (* init task parameters *)

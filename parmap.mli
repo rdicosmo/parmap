@@ -51,7 +51,7 @@ val parmap : ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a sequence -> 'b li
       by forking [n] processes on a multicore machine. *)
 
 
-(** {6 Parallel map specialised on float arrays} *)
+(** {6 Parallel map specialised on arrays} *)
 
-val array_parmap : ?ncores:int -> (float -> float) -> float array -> float array
-  (** specialised version for float arrays *)
+val array_parmap : ?ncores:int -> ('a -> 'b) -> 'a array -> 'b array
+  (** specialised version for arrays *)
