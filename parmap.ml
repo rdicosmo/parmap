@@ -80,7 +80,7 @@ let tempfd () =
 type msg_up = Ready of int | Error of int * string;;
 type msg_down = Finished | Task of int;;
 
-(* the core parallel mapfold function *)
+(* the core parallel mapfold function, with automatic load balancing *)
 
 let setup_children_chans pipeup pipedown fdarr i = 
   Setcore.setcore i;
@@ -136,7 +136,7 @@ let mapper ncores ~chunksize compute opid al collect =
           (* primitives for communication *)
           let receive,getTask, getFinish,signal,return,finish,pid = setup_children_chans pipeup pipedown fdarr i in
           let reschunk=ref opid in
-          let compute n = (* compute chunk number n *)
+          let computetask n = (* compute chunk number n *)
 	    let lo=n*chunksize in
 	    let hi=if n=ntasks-1 then ln-1 else (n+1)*chunksize-1 in
             let exc_handler e j = (* handle an exception at index j *)
@@ -154,7 +154,7 @@ let mapper ncores ~chunksize compute opid al collect =
 	  if ncores=ntasks then (* each worker handles a single chunk *)
 	    begin
 	      signal (Ready i); 
-	      getTask (fun n -> compute n);
+	      getTask (fun n -> computetask n);
 	      getFinish (fun () -> return (!reschunk:'d); finish ())
 	    end
 	  else (* each worker performs a loop handling one chunk after the other *)
@@ -163,7 +163,7 @@ let mapper ncores ~chunksize compute opid al collect =
             signal (Ready i);
             match receive() with
 	    | Finished -> return (!reschunk:'d); finish ()
-	    | Task n -> compute n
+	    | Task n -> computetask n
 	  done;
 	end
     | -1 ->  Printf.eprintf "[Parmap] Fork error: pid %d; i=%d.\n%!" (Unix.getpid()) i; 
