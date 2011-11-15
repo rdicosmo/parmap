@@ -55,6 +55,9 @@ let checksum_list list () =
 Printf.printf "Test: normal parmap\n%!";;
 scale_test ~chunksize:chunksize ~inorder:inOrder func (A xs) nIters nProcs nProcs;;
 
-Printf.printf "Test: specialised float array parmap\n%!";;
+Printf.printf "Test: specialised array parmap\n%!";;
 array_scale_test ~chunksize:chunksize ~inorder:inOrder func xs nIters nProcs nProcs;;
+
+Printf.printf "Test: specialised float array parmap\n%!";;
+array_float_scale_test ~chunksize:chunksize ~inorder:inOrder func xs nIters nProcs nProcs;;
 
