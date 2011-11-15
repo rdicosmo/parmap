@@ -48,10 +48,30 @@ val parmap : ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a sequence -> 'b li
   (** [parmap  ~ncores:n f (L l) ] computes [List.map f l] 
       by forking [n] processes on a multicore machine.
       [parmap  ~ncores:n f (A a) ] computes [Array.map f a] 
-      by forking [n] processes on a multicore machine. *)
+      by forking [n] processes on a multicore machine.
+      If the optional [chunksize] parameter is specified,
+      the processes compute the result in an on-demand fashion
+      on blochs of size [chunksize]; this provides automatic
+      load balancing for unbalanced computations, but the order
+      of the result is no longer guaranteed to be preserved. *)
 
 
-(** {6 Parallel map specialised on arrays} *)
+(** {6 Parallel map on arrays} *)
 
-val array_parmap : ?ncores:int -> ('a -> 'b) -> 'a array -> 'b array
-  (** specialised version for arrays *)
+val array_parmap : ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a array -> 'b array
+  (** [array_parmap  ~ncores:n f a ] computes [Array.map f a] 
+      by forking [n] processes on a multicore machine.
+      If the optional [chunksize] parameter is specified,
+      the processes compute the result in an on-demand fashion
+      on blochs of size [chunksize]; this provides automatic
+      load balancing for unbalanced computations, but the order
+      of the result is no longer guaranteed to be preserved. *)
+
+(** {6 Parallel map on float arrays } *)
+
+val array_float_parmap : ?ncores:int -> ?chunksize:int -> ('a -> float) -> 'a array -> float array
+  (** [array_float_parmap  ~ncores:n f a ] computes [Array.map f a] 
+      by forking [n] processes on a multicore machine, and
+      preallocating the resulting array as shared memory.
+      The optional [chunksize] parameter is ignored, and the
+      result is returned in the original order. *)
