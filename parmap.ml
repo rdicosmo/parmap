@@ -18,7 +18,19 @@ open ExtLib
 
 type 'a sequence = L of 'a list | A of 'a array;;
 
-let debug=false;;
+let debug_enabled = ref false;;
+
+let log_dir = ref (Printf.sprintf "/tmp/.parmap.%d" (Unix.getpid ()))
+
+let debug fmt =
+  Printf.kprintf (
+    if !debug_enabled then begin
+      (fun s -> Format.eprintf "[Parmap]: %s@." s)
+    end else ignore
+  ) fmt
+
+let info fmt =
+  Printf.kprintf (fun s -> Format.eprintf "[Parmap]: %s@." s) fmt
 
 (* utils *)
 
@@ -41,18 +53,19 @@ let index_of e l =
 
 (* freopen emulation, from Xavier's suggestion on OCaml mailing list *)
 
-let reopen_out outchan filename =
+let reopen_out outchan fname =
   flush outchan;
+  if not(Sys.file_exists !log_dir) then Unix.mkdir !log_dir 0o777 ;
+  let filename = Filename.concat !log_dir fname in
   let fd1 = Unix.descr_of_out_channel outchan in
-  let fd2 =
-    Unix.openfile filename [Unix.O_WRONLY; Unix.O_CREAT; Unix.O_TRUNC] 0o666 in
+  let fd2 = Unix.openfile filename [Unix.O_WRONLY; Unix.O_CREAT; Unix.O_TRUNC] 0o666 in
   Unix.dup2 fd2 fd1;
   Unix.close fd2
 
 (* unmarshal from a mmap seen as a bigarray *)
 let unmarshal fd =
- let a=Bigarray.Array1.map_file fd Bigarray.char Bigarray.c_layout true (-1) in
- let res=Bytearray.unmarshal a 0 in
+ let a = Bigarray.Array1.map_file fd Bigarray.char Bigarray.c_layout true (-1) in
+ let res = Bytearray.unmarshal a 0 in
  Unix.close fd; 
  res
 
@@ -86,28 +99,28 @@ let simplemapper ncores compute opid al collect =
   (* create descriptors to mmap *)
   let fdarr=Array.init ncores (fun _ -> tempfd()) in
   for i = 0 to ncores-1 do
-       match Unix.fork() with
+    match Unix.fork() with
       0 -> 
 	begin
           let lo=i*chunksize in
           let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
           let exc_handler e j = (* handle an exception at index j *)
-	    begin
-	      let errmsg = Printexc.to_string e
-	      in Printf.eprintf "[Parmap] Error at index j=%d in (%d,%d), chunksize=%d of a total of %d got exception %s on core %d \n%!"
-		j lo hi chunksize (hi-lo+1) errmsg i;
-	        exit 1
-	    end
+	    info "error at index j=%d in (%d,%d), chunksize=%d of a total of %d got exception %s on core %d \n%!"
+	      j lo hi chunksize (hi-lo+1) (Printexc.to_string e) i;
+	    exit 1
           in		    
 	  let v = compute al lo hi opid exc_handler in
           marshal fdarr.(i) v;
           exit 0
 	end
-    | -1 ->  Printf.eprintf "[Parmap] Fork error: pid %d; i=%d.\n" (Unix.getpid()) i; 
+    | -1 -> info "fork error: pid %d; i=%d" (Unix.getpid()) i; 
     | pid -> ()
   done;
   (* wait for all children *)
-  for i = 0 to ncores-1 do try ignore(Unix.wait()) with Unix.Unix_error (Unix.ECHILD, _, _) -> () done;
+  for i = 0 to ncores-1 do 
+    try ignore(Unix.wait()) 
+    with Unix.Unix_error (Unix.ECHILD, _, _) -> ()
+  done;
   (* read in all data *)
   let res = ref [] in
   (* iterate in reverse order, to accumulate in the right order *)
@@ -123,8 +136,8 @@ let simplemapper ncores compute opid al collect =
 
 (* the type of messages exchanged between master and workers *)
 
-type msg_up = Ready of int | Error of int * string;;
-type msg_down = Finished | Task of int;;
+type msg_to_master = Ready of int | Error of int * string;;
+type msg_to_worker = Finished | Task of int;;
 
 
 let setup_children_chans pipeup pipedown fdarr i = 
@@ -142,9 +155,9 @@ let setup_children_chans pipeup pipedown fdarr i =
   let return v = 
     let d = Unix.gettimeofday() in 
     let _ = marshal fdarr.(i) v in
-    if debug then Printf.eprintf "[Parmap]: worker elapsed %f in marshalling\n%!" (Unix.gettimeofday() -. d) in
+    debug "worker elapsed %f in marshalling" (Unix.gettimeofday() -. d) in
   let finish () =
-    (if debug then Printf.eprintf "Shutting down (pid=%d)\n%!" pid;
+    (debug "shutting down (pid=%d)\n%!" pid;
      try close_in ic; close_out oc with _ -> ()
     ); exit 0 in 
   receive, signal, return, finish, pid
@@ -182,13 +195,13 @@ let mapper ncores ~chunksize compute opid al collect =
 		let exc_handler e j = (* handle an exception at index j *)
 		  begin
 		    let errmsg = Printexc.to_string e
-		    in Printf.eprintf "[Parmap]` Error at index j=%d in (%d,%d), chunksize=%d of a total of %d got exception %s on core %d \n%!"
+		    in info "error at index j=%d in (%d,%d), chunksize=%d of a total of %d got exception %s on core %d \n%!"
 		      j lo hi chunksize (hi-lo+1) errmsg i;
 		    signal (Error (i,errmsg)); finish()
 		  end
 		in		    
 		reschunk:= compute al lo hi !reschunk exc_handler;
-		Printf.eprintf "[Parmap] Worker on core %d (pid=%d), segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds\n%!"
+		info "worker on core %d (pid=%d), segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
 		  i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
 	      in
 	      while true do
@@ -199,12 +212,13 @@ let mapper ncores ~chunksize compute opid al collect =
 		| Task n -> computetask n
 	      done;
 	    end
-	| -1 ->  Printf.eprintf "[Parmap] Fork error: pid %d; i=%d.\n%!" (Unix.getpid()) i; 
+	| -1 ->  info "fork error: pid %d; i=%d" (Unix.getpid()) i; 
 	| pid -> ()
       done;
 
       (* close unused ends of the pipes *)
-      Array.iter (fun (rfd,_) -> Unix.close rfd) pipedown; Array.iter (fun (_,wfd) -> Unix.close wfd) pipeup;
+      Array.iter (fun (rfd,_) -> Unix.close rfd) pipedown;
+      Array.iter (fun (_,wfd) -> Unix.close wfd) pipeup;
 
       (* get ic/oc/wfdl *)
       let wfdl = List.map fst (Array.to_list pipeup) in
@@ -213,23 +227,30 @@ let mapper ncores ~chunksize compute opid al collect =
 
       (* feed workers until all tasks are finished *)
       for i=0 to ntasks-1 do
-	if debug then Printf.eprintf "Select for task %d (ncores=%d, ntasks=%d)\n%!" i ncores ntasks;
+	debug "select for task %d (ncores=%d, ntasks=%d)" i ncores ntasks;
 	let readyl,_,_ = Unix.select wfdl [] [] (-1.) in
 	let wfd=List.hd readyl in (* List.hd never fails here *)
 	let w=index_of wfd wfdl
 	in match Marshal.from_channel ics.(w) with
 	  Ready w -> 
-	    (if debug then Printf.eprintf "Sending task %d to worker %d\n%!" i w;
+	    (debug "sending task %d to worker %d" i w;
 	     let oc = ocs.(w) in
 	     (Marshal.to_channel oc (Task i) []); flush oc)
-	| Error (core,msg) -> (Printf.eprintf "[Parmap]: aborting due to exception on core %d: %s\n%!" core msg; exit 1)
+	| Error (core,msg) -> (info "aborting due to exception on core %d: %s" core msg; exit 1)
       done;
 
       (* send termination token to all children *)
-      Array.iter (fun oc -> Marshal.to_channel oc Finished []; flush oc; close_out oc) ocs;
+      Array.iter (fun oc -> 
+	Marshal.to_channel oc Finished []; 
+        flush oc; 
+        close_out oc
+      ) ocs;
 
       (* wait for all children to terminate *)
-      for i = 0 to ncores-1 do try ignore(Unix.wait()) with Unix.Unix_error (Unix.ECHILD, _, _) -> () done;
+      for i = 0 to ncores-1 do 
+	try ignore(Unix.wait()) 
+	with Unix.Unix_error (Unix.ECHILD, _, _) -> ()
+      done;
 
       (* read in all data *)
       let res = ref [] in
