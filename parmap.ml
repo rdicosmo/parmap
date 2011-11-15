@@ -77,7 +77,7 @@ let tempfd () =
 
 (* the type of messages exchanged between master and workers *)
 
-type msg_up = Ready of int | Error of int * string | AckFinish;;
+type msg_up = Ready of int | Error of int * string;;
 type msg_down = Finished | Task of int;;
 
 (* the core parallel mapfold function *)
@@ -97,8 +97,7 @@ let setup_children_chans pipeup pipedown fdarr i =
   let return v = 
     let d = Unix.gettimeofday() in 
     let _ = marshal fdarr.(i) v in
-    signal AckFinish;
-    Printf.eprintf "[Parmap]: worker elapsed %f in marshalling\n%!" (Unix.gettimeofday() -. d) in
+    if debug then Printf.eprintf "[Parmap]: worker elapsed %f in marshalling\n%!" (Unix.gettimeofday() -. d) in
   let finish () =
     (if debug then Printf.eprintf "Shutting down (pid=%d)\n%!" pid;
      try close_in ic; close_out oc with _ -> ()
@@ -177,7 +176,7 @@ let mapper ncores ~chunksize compute opid al collect =
   (* in case ntasks=ncores, preserve the ordering *)
   let tasksel = if ntasks=ncores then fst else snd in
 
-  Printf.eprintf "[Parmap]: %f elapsed in forking and setup up to starting the feeder\n%!" (Unix.gettimeofday() -. tstart);
+  if debug then Printf.eprintf "[Parmap]: %f elapsed in forking and setup up to starting the feeder\n%!" (Unix.gettimeofday() -. tstart);
   let tfeedstart=Unix.gettimeofday() in
 
   for i=0 to ntasks-1 do
@@ -191,36 +190,18 @@ let mapper ncores ~chunksize compute opid al collect =
          let oc = ocs.(w) in
 	 (Marshal.to_channel oc (Task (tasksel(w,i))) []); flush oc)
     | Error (core,msg) -> (Printf.eprintf "[Parmap]: aborting due to exception on core %d: %s\n%!" core msg; exit 1)
-    | _ -> (Printf.eprintf "[Parmap]: aborting due to communication error in main\n%!"; exit 1)
   done;
   
   (* send termination token to all children *)
   Array.iter (fun oc -> Marshal.to_channel oc Finished []; flush oc; close_out oc) ocs;
 
-  Printf.eprintf "[Parmap]: %f elapsed feeding and sending termination tokens\n%!" (Unix.gettimeofday() -. tfeedstart);
-  let tack = Unix.gettimeofday() in  
-
-  (* wait for ack from all children *)
-  for i=0 to ncores-1 do
-  let tselect = Unix.gettimeofday() in  
-    let readyl,_,_ = Unix.select wfdl [] [] (-1.) in
-    let wfd=List.hd readyl in (* List.hd never fails here *)
-    let w=index_of wfd wfdl in
-    Printf.eprintf "[Parmap]: %f elapsed in select\n%!" (Unix.gettimeofday() -. tselect);
-    match Marshal.from_channel ics.(w) with
-      AckFinish -> ()
-    | _ -> (Printf.eprintf "[Parmap]: aborting due to communication error on main\n%!" ; exit 1)
-  done;
-
-  Printf.eprintf "[Parmap]: %f elapsed waiting for ack of termination tokens\n%!" (Unix.gettimeofday() -. tack);
+  if debug then Printf.eprintf "[Parmap]: %f elapsed feeding and sending termination tokens\n%!" (Unix.gettimeofday() -. tfeedstart);
   let twait = Unix.gettimeofday() in  
 
   (* wait for all children to terminate *)
-(*
   for i = 0 to ncores-1 do try ignore(Unix.wait()) with Unix.Unix_error (Unix.ECHILD, _, _) -> () done;
- *)
 
-  Printf.eprintf "[Parmap]: %f elapsed waiting for children to terminate\n%!" (Unix.gettimeofday() -. twait);
+  if debug then Printf.eprintf "[Parmap]: %f elapsed waiting for children to terminate\n%!" (Unix.gettimeofday() -. twait);
   let tcollect = Unix.gettimeofday() in  
 
   (* read in all data *)
@@ -231,7 +212,7 @@ let mapper ncores ~chunksize compute opid al collect =
   done;
   (* collect all results *)
   let r = collect !res in
-  Printf.eprintf "[Parmap]: %f elapsed unmarhsalling and collecting\n%!" (Unix.gettimeofday() -. tcollect);  
+  (if debug then Printf.eprintf "[Parmap]: %f elapsed unmarhsalling and collecting\n%!" (Unix.gettimeofday() -. tcollect));  
   r
 ;;
 
