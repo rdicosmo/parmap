@@ -18,7 +18,7 @@ open ExtLib
 
 type 'a sequence = L of 'a list | A of 'a array;;
 
-let debug=false;;
+let debug=true;;
 
 (* utils *)
 
@@ -93,6 +93,10 @@ let setup_children_chans pipeup pipedown fdarr i =
   let ic = Unix.in_channel_of_descr (fst pipedown.(i))
   and oc = Unix.out_channel_of_descr (snd pipeup.(i)) in
   let receive () = Marshal.from_channel ic in
+  let getTask f =  
+    match receive() with Task n -> f n | _ -> failwith "Wrong control message in mapper" in
+  let getFinish f =  
+    match receive() with Finished -> f () | _ -> failwith "Wrong control message in mapper" in
   let signal v = Marshal.to_channel oc v []; flush oc in
   let return v = 
     let d = Unix.gettimeofday() in 
@@ -102,7 +106,7 @@ let setup_children_chans pipeup pipedown fdarr i =
     (if debug then Printf.eprintf "Shutting down (pid=%d)\n%!" pid;
      try close_in ic; close_out oc with _ -> ()
     ); exit 0 in 
-  receive, signal, return, finish, pid
+  receive, getTask, getFinish, signal, return, finish, pid
 ;;
 
 (* parametric mapper primitive that captures the parallel structure *)
@@ -110,7 +114,7 @@ let setup_children_chans pipeup pipedown fdarr i =
 let mapper ncores ~chunksize compute opid al collect =
   let tstart=Unix.gettimeofday()  in
   (* flush everything *)
-  flush stdout; flush stderr;
+  flush_all ();
   (* init task parameters *)
   let ln = Array.length al in
   let chunksize, ntasks = 
@@ -118,19 +122,21 @@ let mapper ncores ~chunksize compute opid al collect =
       None -> (ln/ncores, ncores)
     | Some v -> (v,ln/v)
   in
+  (* create descriptors to mmap *)
   let fdarr=Array.init ncores (fun _ -> tempfd()) in
   (* setup communication channel with the workers *)
   let pipedown=Array.init ncores (fun _ -> Unix.pipe ()) in
   let pipeup=Array.init ncores (fun _ -> Unix.pipe ()) in
+  (* spawn children *)
   for i = 0 to ncores-1 do
        match Unix.fork() with
       0 -> 
 	begin    
           let d=Unix.gettimeofday()  in
           (* primitives for communication *)
-          let receive,signal,return,finish,pid = setup_children_chans pipeup pipedown fdarr i in
+          let receive,getTask, getFinish,signal,return,finish,pid = setup_children_chans pipeup pipedown fdarr i in
           let reschunk=ref opid in
-          let compute n = 
+          let compute n = (* compute chunk number n *)
 	    let lo=n*chunksize in
 	    let hi=if n=ntasks-1 then ln-1 else (n+1)*chunksize-1 in
             let exc_handler e j = (* handle an exception at index j *)
@@ -148,8 +154,8 @@ let mapper ncores ~chunksize compute opid al collect =
 	  if ncores=ntasks then (* each worker handles a single chunk *)
 	    begin
 	      signal (Ready i); 
-	      (match receive() with Task n -> compute n | _ -> failwith "Wrong control message in mapper");
-	      (match receive() with Finished -> return (!reschunk:'d); finish () | _ -> failwith "Wrong control message in mapper") 
+	      getTask (fun n -> compute n);
+	      getFinish (fun () -> return (!reschunk:'d); finish ())
 	    end
 	  else (* each worker performs a loop handling one chunk after the other *)
 	  while true do
@@ -164,8 +170,7 @@ let mapper ncores ~chunksize compute opid al collect =
     | pid -> ()
   done;
   (* close unused ends of the pipes *)
-  Array.iter (fun (rfd,_) -> Unix.close rfd) pipedown;
-  Array.iter (fun (_,wfd) -> Unix.close wfd) pipeup;
+  Array.iter (fun (rfd,_) -> Unix.close rfd) pipedown; Array.iter (fun (_,wfd) -> Unix.close wfd) pipeup;
   (* get ic/oc/wfdl *)
   let wfdl = List.map fst (Array.to_list pipeup) in
   let ocs=Array.init ncores (fun n -> Unix.out_channel_of_descr (snd pipedown.(n))) in
@@ -295,44 +300,56 @@ let array_float_parmap ?(ncores=1) ?chunksize (f:'a -> float) (al:'a array) : fl
   res
 ;;  
 
-(*
+(*** this specialised code is here just for testing whether it is worthwhile *)
 
-(*
-let array_parmap ?(ncores=1) (f:float -> float) (al:float array) : float array=
- *)
-let array_parmap ?(ncores=1) f al =
+let floatmapper ncores compute al =
+  let t = Unix.gettimeofday() in
   (* flush everything *)
   flush stdout; flush stderr;
   (* init task parameters *)
   let ln = Array.length al in
   let chunksize = ln/ncores in
-  let fdarr=Array.init ncores (fun _ -> tempfd()) in
   for i = 0 to ncores-1 do
        match Unix.fork() with
       0 -> 
 	begin
           let lo=i*chunksize in
           let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
-	  let res = 
-	    try 
-	      map_intv lo hi f al;
-	    with e -> (Printf.printf "Error: got exception %s\n" (Printexc.to_string e)); raise e
-	  in  marshal fdarr.(i) res;
+          let exc_handler e j = (* handle an exception at index j *)
+	    begin
+	      let errmsg = Printexc.to_string e
+	      in Printf.eprintf "[Parmap] Error at index j=%d in (%d,%d), chunksize=%d of a total of %d got exception %s on core %d \n%!"
+		j lo hi chunksize (hi-lo+1) errmsg i;
+	        exit 1
+	    end
+          in		    
+	  compute lo hi exc_handler;
           exit 0
 	end
     | -1 ->  Printf.eprintf "Fork error: pid %d; i=%d.\n" (Unix.getpid()) i; 
     | pid -> ()
   done;
+  Printf.eprintf "Setup: %f\n%!" (Unix.gettimeofday() -. t);
   (* wait for all children *)
+  let t = Unix.gettimeofday() in
   for i = 0 to ncores-1 do try ignore(Unix.wait()) with Unix.Unix_error (Unix.ECHILD, _, _) -> () done;
-  (* read in all data *)
-  let res = ref [] in
-  (* iterate in reverse order, to accumulate in the right order *)
-  for i = 0 to ncores-1 do
-      res:= ((unmarshal fdarr.((ncores-1)-i)):'d)::!res;
-  done;
-  (* use extLib's tail recursive one *)
-  Array.concat !res
+  Printf.eprintf "Wait: %f\n%!" (Unix.gettimeofday() -. t)
 ;;
 
-*)
+let array_float_parmap ?(ncores=1) ?chunksize (f:'a -> float) (al:'a array) : float array=
+  let t = Unix.gettimeofday() in
+  let size = Array.length al in
+  let fd = Unix.openfile "/dev/zero" [Unix.O_RDWR; Unix.O_CREAT] 0o600 in
+  let arr_out = Bigarray.Array1.map_file fd Bigarray.float64 Bigarray.c_layout true size in
+  let compute lo hi exc_handler =
+    try 
+      for i=lo to hi do Bigarray.Array1.unsafe_set arr_out i (f al.(i)) done
+    with e -> exc_handler e lo
+  in
+  floatmapper ncores compute al;
+  let res = Array.init size (fun i -> Bigarray.Array1.unsafe_get arr_out i) in
+  Unix.close fd;
+  Printf.eprintf "Overall: %f\n%!" (Unix.gettimeofday() -. t);
+  res
+;;  
+
