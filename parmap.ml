@@ -353,3 +353,44 @@ let array_float_parmap ?(ncores=1) ?chunksize (f:'a -> float) (al:'a array) : fl
   res
 ;;  
 
+
+let simplemapper ncores compute opid al collect =
+  (* flush everything *)
+  flush_all();
+  (* init task parameters *)
+  let ln = Array.length al in
+  let chunksize = ln/ncores in
+  (* create descriptors to mmap *)
+  let fdarr=Array.init ncores (fun _ -> tempfd()) in
+  for i = 0 to ncores-1 do
+       match Unix.fork() with
+      0 -> 
+	begin
+          let lo=i*chunksize in
+          let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
+          let exc_handler e j = (* handle an exception at index j *)
+	    begin
+	      let errmsg = Printexc.to_string e
+	      in Printf.eprintf "[Parmap] Error at index j=%d in (%d,%d), chunksize=%d of a total of %d got exception %s on core %d \n%!"
+		j lo hi chunksize (hi-lo+1) errmsg i;
+	        exit 1
+	    end
+          in		    
+	  let v = compute al lo hi opid exc_handler in
+          marshal fdarr.(i) v;
+          exit 0
+	end
+    | -1 ->  Printf.eprintf "Fork error: pid %d; i=%d.\n" (Unix.getpid()) i; 
+    | pid -> ()
+  done;
+  (* wait for all children *)
+  for i = 0 to ncores-1 do try ignore(Unix.wait()) with Unix.Unix_error (Unix.ECHILD, _, _) -> () done;
+  (* read in all data *)
+  let res = ref [] in
+  (* iterate in reverse order, to accumulate in the right order *)
+  for i = 0 to ncores-1 do
+      res:= ((unmarshal fdarr.((ncores-1)-i)):'d)::!res;
+  done;
+  (* collect all results *)
+  collect !res
+;;
