@@ -77,20 +77,41 @@ let tempfd () =
 
 (* the type of messages exchanged between master and workers *)
 
-type msg_up = Ready of int | Error of int * string;;
+type msg_up = Ready of int | Error of int * string | AckFinish;;
 type msg_down = Finished | Task of int;;
 
 (* the core parallel mapfold function *)
 
-let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c->'c) (opid:'c) (concat:'c->'c->'c) : 'c=
+let setup_children_chans pipeup pipedown fdarr i = 
+  Setcore.setcore i;
+  (* send stdout and stderr to a file to avoid mixing output from different cores *)
+  reopen_out stdout (Printf.sprintf "stdout.%d" i);
+  reopen_out stderr (Printf.sprintf "stderr.%d" i);
+  (* close the other ends of the pipe and convert my ends to ic/oc *)
+  Unix.close (snd pipedown.(i));Unix.close (fst pipeup.(i));
+  let pid = Unix.getpid() in
+  let ic = Unix.in_channel_of_descr (fst pipedown.(i))
+  and oc = Unix.out_channel_of_descr (snd pipeup.(i)) in
+  let receive () = Marshal.from_channel ic in
+  let signal v = Marshal.to_channel oc v []; flush oc in
+  let return v = 
+    let d = Unix.gettimeofday() in 
+    let _ = marshal fdarr.(i) v in
+    signal AckFinish;
+    Printf.eprintf "[Parmap]: worker elapsed %f in marshalling\n%!" (Unix.gettimeofday() -. d) in
+  let finish () =
+    (if debug then Printf.eprintf "Shutting down (pid=%d)\n%!" pid;
+     try close_in ic; close_out oc with _ -> ()
+    ); exit 0 in 
+  receive, signal, return, finish, pid
+;;
+
+(* parametric mapper primitive that captures the parallel structure *)
+
+let mapper ncores ~chunksize compute opid al collect =
+  let tstart=Unix.gettimeofday()  in
   (* flush everything *)
   flush stdout; flush stderr;
-  (* enforce array to speed up access to the list elements *)
-  let al = 
-    match s with 
-      A al -> al
-    | L l  -> Array.of_list l 
-  in
   (* init task parameters *)
   let ln = Array.length al in
   let chunksize, ntasks = 
@@ -106,45 +127,41 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
        match Unix.fork() with
       0 -> 
 	begin    
-          let d=Unix.gettimeofday() and pid = Unix.getpid() in
-          Setcore.setcore i;
+          let d=Unix.gettimeofday()  in
+          (* primitives for communication *)
+          let receive,signal,return,finish,pid = setup_children_chans pipeup pipedown fdarr i in
           let reschunk=ref opid in
-          (* send stdout and stderr to a file to avoid mixing output from different cores *)
-	  reopen_out stdout (Printf.sprintf "stdout.%d" i);
-	  reopen_out stderr (Printf.sprintf "stderr.%d" i);
-          (* close the other ends of the pipe and convert my ends to ic/oc *)
-          Unix.close (snd pipedown.(i));Unix.close (fst pipeup.(i));
-          let ic = Unix.in_channel_of_descr (fst pipedown.(i))
-          and oc = Unix.out_channel_of_descr (snd pipeup.(i)) in
-          let finish () = (try close_in ic; close_out oc with _ -> ()); exit 0 in 
+          let compute n = 
+	    let lo=n*chunksize in
+	    let hi=if n=ntasks-1 then ln-1 else (n+1)*chunksize-1 in
+            let exc_handler e j = (* handle an exception at index j *)
+	      begin
+		let errmsg = Printexc.to_string e
+		in Printf.eprintf "[Parmap] Error at index j=%d in (%d,%d), chunksize=%d of a total of %d got exception %s on core %d \n%!"
+		  j lo hi chunksize (hi-lo+1) errmsg i;
+		signal (Error (i,errmsg)); finish()
+	      end
+            in		    
+            reschunk:= compute al lo hi !reschunk exc_handler;
+	    Printf.eprintf "[Parmap] Worker on core %d (pid=%d), segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds\n%!"
+	      i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
+	  in
+	  if ncores=ntasks then (* each worker handles a single chunk *)
+	    begin
+	      signal (Ready i); 
+	      (match receive() with Task n -> compute n | _ -> failwith "Wrong control message in mapper");
+	      (match receive() with Finished -> return (!reschunk:'d); finish () | _ -> failwith "Wrong control message in mapper") 
+	    end
+	  else (* each worker performs a loop handling one chunk after the other *)
 	  while true do
             (* ask for work until we are finished *)
-	    if debug then Printf.eprintf "Sending Ready token (pid=%d)\n%!" pid;
-            Marshal.to_channel oc (Ready i) []; flush oc;
-            let token = (Marshal.from_channel ic) in
-	    if debug then Printf.eprintf "Received token from master (pid=%d)\n%!" pid;
-            match token with
-	    | Finished -> ( if debug then Printf.eprintf "Shutting down (pid=%d)\n%!" pid; marshal fdarr.(i) (!reschunk:'d); finish ())
-	    | Task i -> 
-		let lo=i*chunksize in
-		let hi=if i=ntasks-1 then ln-1 else (i+1)*chunksize-1 in
-		(* iterate in reverse order, to accumulate in the right order *)
-		for j=0 to (hi-lo) do
-		  try 
-		    reschunk := op (f (Array.unsafe_get al (hi-j))) !reschunk;
-		  with e -> 
-		    begin
-		      let errmsg = Printexc.to_string e
-		      in Printf.eprintf "[Parmap] Error at index j=%d in (%d,%d), chunksize=%d of a total of %d got exception %s on core %d \n"
-			j hi lo chunksize (hi-lo+1) errmsg i;
-		      Marshal.to_channel oc (Error (i,errmsg)) []; flush oc; finish()
-		    end;
-		    Printf.eprintf "[Parmap] Worker on core %d, segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds\n"
-		      i hi lo ln chunksize (Unix.gettimeofday() -. d)
-		done;
+            signal (Ready i);
+            match receive() with
+	    | Finished -> return (!reschunk:'d); finish ()
+	    | Task n -> compute n
 	  done;
 	end
-    | -1 ->  Printf.eprintf "[Parmap] Fork error: pid %d; i=%d.\n" (Unix.getpid()) i; 
+    | -1 ->  Printf.eprintf "[Parmap] Fork error: pid %d; i=%d.\n%!" (Unix.getpid()) i; 
     | pid -> ()
   done;
   (* close unused ends of the pipes *)
@@ -160,6 +177,9 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
   (* in case ntasks=ncores, preserve the ordering *)
   let tasksel = if ntasks=ncores then fst else snd in
 
+  Printf.eprintf "[Parmap]: %f elapsed in forking and setup up to starting the feeder\n%!" (Unix.gettimeofday() -. tstart);
+  let tfeedstart=Unix.gettimeofday() in
+
   for i=0 to ntasks-1 do
     if debug then Printf.eprintf "Select for task %d (ncores=%d, ntasks=%d)\n%!" i ncores ntasks;
     let readyl,_,_ = Unix.select wfdl [] [] (-1.) in
@@ -170,28 +190,84 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
 	(if debug then Printf.eprintf "Sending task %d to worker %d\n%!" (tasksel (w,i)) w;
          let oc = ocs.(w) in
 	 (Marshal.to_channel oc (Task (tasksel(w,i))) []); flush oc)
-    | Error (core,msg) -> (Printf.eprintf "[Parmap]: aborting due to exception on core %d: %s\n" core msg; exit 1)
+    | Error (core,msg) -> (Printf.eprintf "[Parmap]: aborting due to exception on core %d: %s\n%!" core msg; exit 1)
+    | _ -> (Printf.eprintf "[Parmap]: aborting due to communication error in main\n%!"; exit 1)
   done;
   
-  (* send termination token to all childrens *)
+  (* send termination token to all children *)
   Array.iter (fun oc -> Marshal.to_channel oc Finished []; flush oc; close_out oc) ocs;
-  
-  (* wait for all childrens to terminate *)
+
+  Printf.eprintf "[Parmap]: %f elapsed feeding and sending termination tokens\n%!" (Unix.gettimeofday() -. tfeedstart);
+  let tack = Unix.gettimeofday() in  
+
+  (* wait for ack from all children *)
+  for i=0 to ncores-1 do
+  let tselect = Unix.gettimeofday() in  
+    let readyl,_,_ = Unix.select wfdl [] [] (-1.) in
+    let wfd=List.hd readyl in (* List.hd never fails here *)
+    let w=index_of wfd wfdl in
+    Printf.eprintf "[Parmap]: %f elapsed in select\n%!" (Unix.gettimeofday() -. tselect);
+    match Marshal.from_channel ics.(w) with
+      AckFinish -> ()
+    | _ -> (Printf.eprintf "[Parmap]: aborting due to communication error on main\n%!" ; exit 1)
+  done;
+
+  Printf.eprintf "[Parmap]: %f elapsed waiting for ack of termination tokens\n%!" (Unix.gettimeofday() -. tack);
+  let twait = Unix.gettimeofday() in  
+
+  (* wait for all children to terminate *)
+(*
   for i = 0 to ncores-1 do try ignore(Unix.wait()) with Unix.Unix_error (Unix.ECHILD, _, _) -> () done;
+ *)
+
+  Printf.eprintf "[Parmap]: %f elapsed waiting for children to terminate\n%!" (Unix.gettimeofday() -. twait);
+  let tcollect = Unix.gettimeofday() in  
+
   (* read in all data *)
   let res = ref [] in
   (* iterate in reverse order, to accumulate in the right order *)
   for i = 0 to ncores-1 do
       res:= ((unmarshal fdarr.((ncores-1)-i)):'d)::!res;
   done;
-  (* use extLib's tail recursive one *)
-  List.fold_right concat !res opid
+  (* collect all results *)
+  let r = collect !res in
+  Printf.eprintf "[Parmap]: %f elapsed unmarhsalling and collecting\n%!" (Unix.gettimeofday() -. tcollect);  
+  r
+;;
+
+
+(* the parallel mapfold function *)
+
+let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c->'c) (opid:'c) (concat:'c->'c->'c) : 'c=
+  (* enforce array to speed up access to the list elements *)
+  let al = match s with A al -> al | L l  -> Array.of_list l in
+  let compute al lo hi previous exc_handler =
+    (* iterate in reverse order, to accumulate in the right order *)
+    let r = ref previous in
+    for j=0 to (hi-lo) do
+      try 
+	r := op (f (Array.unsafe_get al (hi-j))) !r;
+      with e -> exc_handler e j
+    done; !r
+  in
+  mapper ncores ~chunksize compute opid al  (fun r -> List.fold_right concat r opid)
 ;;
 
 (* the parallel map function *)
 
 let parmap ?(ncores=1) ?chunksize (f:'a -> 'b) (s:'a sequence) : 'b list=
-    parmapfold ~ncores ?chunksize f s (fun v acc -> v::acc) [] (ExtLib.List.append) 
+  (* enforce array to speed up access to the list elements *)
+  let al = match s with A al -> al | L l  -> Array.of_list l in
+  let compute al lo hi previous exc_handler =
+    (* iterate in reverse order, to accumulate in the right order, and add to acc *)
+    let f' j = try f (Array.unsafe_get al (lo+j)) with e -> exc_handler e j in
+    let rec aux acc = 
+      function
+	  0 ->  (f' 0)::acc
+	| n ->  aux ((f' n)::acc) (n-1)
+    in aux previous (hi-lo)
+  in
+  mapper ncores ~chunksize compute [] al  (fun r -> ExtLib.List.concat r)
 ;;
 
 (* the parallel fold function *)
@@ -201,9 +277,7 @@ let parfold ?(ncores=1) ?chunksize (op:'a -> 'b -> 'b) (s:'a sequence) (opid:'b)
 ;;
 
 
-
-(* the parallel map function, specialised on float arrays *)
-
+(* the parallel map function, on arrays *)
 
 let map_intv lo hi f a =
   let l = hi-lo in
@@ -214,6 +288,33 @@ let map_intv lo hi f a =
     done;
     r
   end
+
+let array_parmap ?(ncores=1) ?chunksize (f:'a -> 'b) (al:'a array) : 'b array=
+  let compute a lo hi previous exc_handler =
+    try 
+      Array.concat [(map_intv lo hi f a);previous]
+    with e -> exc_handler e lo
+  in
+  mapper ncores ~chunksize compute [||] al  (fun r -> Array.concat r)
+;;
+
+
+let array_float_parmap ?(ncores=1) ?chunksize (f:'a -> float) (al:'a array) : float array=
+  let size = Array.length al in
+  let fd = Unix.openfile "/dev/zero" [Unix.O_RDWR; Unix.O_CREAT] 0o600 in
+  let arr_out = Bigarray.Array1.map_file fd Bigarray.float64 Bigarray.c_layout true size in
+  let compute a lo hi previous exc_handler =
+    try 
+      for i=lo to hi do Bigarray.Array1.unsafe_set arr_out i (f al.(i)) done
+    with e -> exc_handler e lo
+  in
+  mapper ncores ~chunksize compute () al  (fun r -> ());
+  let res = Array.init size (fun i -> Bigarray.Array1.unsafe_get arr_out i) in
+  Unix.close fd;
+  res
+;;  
+
+(*
 
 (*
 let array_parmap ?(ncores=1) (f:float -> float) (al:float array) : float array=
@@ -252,3 +353,5 @@ let array_parmap ?(ncores=1) f al =
   (* use extLib's tail recursive one *)
   Array.concat !res
 ;;
+
+*)

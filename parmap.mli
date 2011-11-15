@@ -53,5 +53,8 @@ val parmap : ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a sequence -> 'b li
 
 (** {6 Parallel map specialised on arrays} *)
 
-val array_parmap : ?ncores:int -> ('a -> 'b) -> 'a array -> 'b array
+val array_parmap : ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a array -> 'b array
   (** specialised version for arrays *)
+
+val array_float_parmap : ?ncores:int -> ?chunksize:int -> ('a -> float) -> 'a array -> float array
+  (** specialised version for float arrays *)
