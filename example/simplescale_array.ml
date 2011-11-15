@@ -13,9 +13,6 @@
 open Parmap
 open Utils
 
-let initsegm n = let rec aux acc = function 0 -> acc | n -> aux (n::acc) (n-1) in aux [] n
-;;
-
 let compute p = 
   let r=ref 1 in 
   for i = 1 to 80000 do 
@@ -24,5 +21,19 @@ let compute p =
   !r
 ;;
 
-scale_test compute (A (Array.of_list (initsegm 20000))) 2 1 10;;
+let fcompute p = 
+  let r=ref 1. in 
+  for i = 1 to 80000 do 
+    r:= !r+.(p*.p)-.(p*.(p-.1.))
+  done;
+  !r
+;;
+
+array_scale_test fcompute (Array.init 20000 (fun i -> float_of_int i)) 2 1 10;;
+
+array_float_scale_test fcompute (Array.init 20000 (fun i -> float_of_int i)) 2 1 10;;
+
+scale_test ~chunksize:100 ~inorder:false compute (A (Array.init 20000 (fun i -> i))) 2 1 10;;
+
+scale_test compute (A (Array.init 20000 (fun i -> i))) 2 1 10;;
 
