@@ -1,5 +1,5 @@
-/* Unison file synchronizer: src/bytearray_stubs.c */
-/* Copyright 1999-2010 (see COPYING for details) */
+/* bytearray_stubs.c : C routines for bytearray.ml */
+/* Copyright Jérôme Vouillon 1999-2010 (see LICENCE for distribution conditions) */
 
 #include <string.h>
 

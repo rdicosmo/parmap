@@ -1,5 +1,13 @@
-(* Unison file synchronizer: src/bytearray.mli *)
-(* Copyright 1999-2010, Benjamin C. Pierce (see COPYING for details) *)
+(***************************************************************************)
+(* Copyright 1999-2010, Jérôme Vouillon                                    *)
+(*                                                                         *)
+(*  This library is free software: you can redistribute it and/or modify   *)
+(*  it under the terms of the GNU Lesser General Public License as         *)
+(*  published by the Free Software Foundation, either version 3 of the     *)
+(*  License, or (at your option) any later version.  A special linking     *)
+(*  exception to the GNU Lesser General Public License applies to this     *)
+(*  library, see the LICENSE file for more information.                    *)
+(***************************************************************************)
 
 type t =
   (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
