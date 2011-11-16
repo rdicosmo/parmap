@@ -140,16 +140,15 @@ type msg_to_master = Ready of int | Error of int * string;;
 type msg_to_worker = Finished | Task of int;;
 
 
-let setup_children_chans pipeup pipedown fdarr i = 
+let setup_children_chans oc pipedown fdarr i = 
   Setcore.setcore i;
   (* send stdout and stderr to a file to avoid mixing output from different cores *)
   reopen_out stdout (Printf.sprintf "stdout.%d" i);
   reopen_out stderr (Printf.sprintf "stderr.%d" i);
   (* close the other ends of the pipe and convert my ends to ic/oc *)
-  Unix.close (snd pipedown.(i));Unix.close (fst pipeup.(i));
+  Unix.close (snd pipedown.(i));
   let pid = Unix.getpid() in
-  let ic = Unix.in_channel_of_descr (fst pipedown.(i))
-  and oc = Unix.out_channel_of_descr (snd pipeup.(i)) in
+  let ic = Unix.in_channel_of_descr (fst pipedown.(i)) in
   let receive () = Marshal.from_channel ic in
   let signal v = Marshal.to_channel oc v []; flush oc in
   let return v = 
@@ -179,7 +178,8 @@ let mapper ncores ~chunksize compute opid al collect =
       let fdarr=Array.init ncores (fun _ -> tempfd()) in
       (* setup communication channel with the workers *)
       let pipedown=Array.init ncores (fun _ -> Unix.pipe ()) in
-      let pipeup=Array.init ncores (fun _ -> Unix.pipe ()) in
+      let pipeup_rd,pipeup_wr=Unix.pipe () in
+      let oc_up = Unix.out_channel_of_descr pipeup_wr in
       (* spawn children *)
       for i = 0 to ncores-1 do
 	match Unix.fork() with
@@ -187,7 +187,8 @@ let mapper ncores ~chunksize compute opid al collect =
 	    begin    
               let d=Unix.gettimeofday()  in
               (* primitives for communication *)
-              let receive,signal,return,finish,pid = setup_children_chans pipeup pipedown fdarr i in
+              Unix.close pipeup_rd;
+              let receive,signal,return,finish,pid = setup_children_chans oc_up pipedown fdarr i in
               let reschunk=ref opid in
               let computetask n = (* compute chunk number n *)
 		let lo=n*chunksize in
@@ -218,20 +219,15 @@ let mapper ncores ~chunksize compute opid al collect =
 
       (* close unused ends of the pipes *)
       Array.iter (fun (rfd,_) -> Unix.close rfd) pipedown;
-      Array.iter (fun (_,wfd) -> Unix.close wfd) pipeup;
+      Unix.close pipeup_wr;
 
       (* get ic/oc/wfdl *)
-      let wfdl = List.map fst (Array.to_list pipeup) in
       let ocs=Array.init ncores (fun n -> Unix.out_channel_of_descr (snd pipedown.(n))) in
-      let ics=Array.init ncores (fun n -> Unix.in_channel_of_descr (fst pipeup.(n))) in
+      let ic=Unix.in_channel_of_descr pipeup_rd in
 
       (* feed workers until all tasks are finished *)
       for i=0 to ntasks-1 do
-	debug "select for task %d (ncores=%d, ntasks=%d)" i ncores ntasks;
-	let readyl,_,_ = Unix.select wfdl [] [] (-1.) in
-	let wfd=List.hd readyl in (* List.hd never fails here *)
-	let w=index_of wfd wfdl
-	in match Marshal.from_channel ics.(w) with
+	match Marshal.from_channel ic with
 	  Ready w -> 
 	    (debug "sending task %d to worker %d" i w;
 	     let oc = ocs.(w) in
@@ -331,11 +327,16 @@ let array_float_parmap ?(ncores=1) ?chunksize (f:'a -> float) (al:'a array) : fl
   let arr_out = Bigarray.Array1.map_file fd Bigarray.float64 Bigarray.c_layout true size in
   let compute _ lo hi _ exc_handler =
     try 
-      for i=lo to hi do Bigarray.Array1.unsafe_set arr_out i (f al.(i)) done
+      for i=lo to hi do 
+	Bigarray.Array1.unsafe_set arr_out i (f (Array.unsafe_get al i)) 
+      done
     with e -> exc_handler e lo
   in
   simplemapper ncores compute () al (fun r -> ());
-  let res = Array.init size (fun i -> Bigarray.Array1.unsafe_get arr_out i) in
+  let res = Array.make size 0. in
+  for i = 0 to size-1 do
+    Array.unsafe_set res i (Bigarray.Array1.unsafe_get arr_out i)
+  done;
   Unix.close fd;
   res
 ;;  
