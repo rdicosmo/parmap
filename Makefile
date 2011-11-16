@@ -18,6 +18,10 @@ REQUIRES = extlib unix bigarray
 
 all: $(ARCHIVE) $(XARCHIVE) $(SARCHIVE)
 
+.PHONY: reinstall
+
+reinstall: uninstall install
+
 .PHONY: install
 install: $(LIBS) META
 	ocamlfind remove $(NAME)
