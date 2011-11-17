@@ -5,7 +5,7 @@
 (*                                                                        *)
 (*  This library is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU Lesser General Public License as        *)
-(*  published by the Free Software Foundation, either version 3 of the    *)
+(*  published by the Free Software Foundation, either version 2 of the    *)
 (*  License, or (at your option) any later version.  A special linking    *)
 (*  exception to the GNU Lesser General Public License applies to this    *)
 (*  library, see the LICENSE file for more information.                   *)
@@ -321,22 +321,42 @@ let array_parmap ?(ncores=1) ?chunksize (f:'a -> 'b) (al:'a array) : 'b array=
   mapper ncores ~chunksize compute [||] al  (fun r -> Array.concat r)
 ;;
 
+
+(* This code is highly optimised for operations on float arrays:
+
+   - knowing in advance the size of the result allows to
+     pre-allocate it in a shared memory space as a Bigarray;
+
+   - to write in the Bigarray memory area using the unsafe
+     functions for Arrays, we trick the OCaml compiler into
+     using the Bigarray memory as an Array as follows
+
+       Array.unsafe_get (Obj.magic arr_out) 1
+
+     This works because OCaml compiles access to float arrays
+     as unboxed data, without further integrity checks;
+
+   - the final copy into a real OCaml array is done via a memcpy in C.
+
+     This approach gives a performance which is 2 to 3 times higher
+     w.r.t. array_parmap, at the price of using Obj.magic and 
+     knowledge on the internal representation of arrays and bigarrays.
+ *)
+
 let array_float_parmap ?(ncores=1) ?chunksize (f:'a -> float) (al:'a array) : float array=
   let size = Array.length al in
   let fd = Unix.openfile "/dev/zero" [Unix.O_RDWR; Unix.O_CREAT] 0o600 in
   let arr_out = Bigarray.Array1.map_file fd Bigarray.float64 Bigarray.c_layout true size in
   let compute _ lo hi _ exc_handler =
-    try 
+    try
+      let arr_out = Array.unsafe_get (Obj.magic arr_out) 1 in
       for i=lo to hi do 
-	Bigarray.Array1.unsafe_set arr_out i (f (Array.unsafe_get al i)) 
+	Array.unsafe_set arr_out i (f (Array.unsafe_get al i)) 
       done
     with e -> exc_handler e lo
   in
   simplemapper ncores compute () al (fun r -> ());
-  let res = Array.make size 0. in
-  for i = 0 to size-1 do
-    Array.unsafe_set res i (Bigarray.Array1.unsafe_get arr_out i)
-  done;
+  let res = Bytearray.to_floatarray arr_out size in
   Unix.close fd;
   res
 ;;  

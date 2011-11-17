@@ -1,11 +1,11 @@
 (***************************************************************************)
 (* bytearray.ml : functions for efficient marshaling to and from bigarrays *)
 (*                                                                         *)
-(* Copyright 1999-2010, Jérôme Vouillon                                    *)
+(* Copyright 1999-2011, Jérôme Vouillon                                    *)
 (*                                                                         *)
 (*  This library is free software: you can redistribute it and/or modify   *)
 (*  it under the terms of the GNU Lesser General Public License as         *)
-(*  published by the Free Software Foundation, either version 3 of the     *)
+(*  published by the Free Software Foundation, either version 2 of the     *)
 (*  License, or (at your option) any later version.  A special linking     *)
 (*  exception to the GNU Lesser General Public License applies to this     *)
 (*  library, see the LICENSE file for more information.                    *)
@@ -15,9 +15,13 @@ open Bigarray
 
 type t = (char, int8_unsigned_elt, c_layout) Array1.t
 
+type tf = (float, float64_elt, c_layout) Array1.t
+
 let length = Bigarray.Array1.dim
 
 let create l = Bigarray.Array1.create Bigarray.char Bigarray.c_layout l
+
+let createf l = Bigarray.Array1.create Bigarray.float64 Bigarray.c_layout l
 
 (*
 let unsafe_blit_from_string s i a j l =
@@ -91,3 +95,20 @@ external marshal_to_buffer : t -> int -> 'a -> Marshal.extern_flags list -> int
 
 external unmarshal : t -> int -> 'a
   = "ml_unmarshal_from_bigarray"
+
+external unsafe_blit_from_floatarray : float array -> int -> tf -> int -> int -> unit
+  = "ml_blit_floatarray_to_bigarray" "noalloc"
+
+external unsafe_blit_to_floatarray : tf -> int -> float array -> int -> int -> unit
+  = "ml_blit_bigarray_to_floatarray" "noalloc"
+
+let to_floatarray a l =
+  let fa = Obj.obj (Obj.new_block Obj.double_array_tag l) in
+  unsafe_blit_to_floatarray a 0 fa 0 l;
+  fa
+
+let of_floatarray fa =
+  let l = Array.length fa in
+  let a = createf l in 
+  unsafe_blit_from_floatarray fa 0 a 0 l;
+  a

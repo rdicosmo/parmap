@@ -7,6 +7,7 @@
 #include "caml/bigarray.h"
 
 #define Array_data(a, i) (((char *) a->data) + Long_val(i))
+#define Floatarray_data(a, i) (((char *) a->data) + 8 * Long_val(i))
 
 CAMLprim value ml_marshal_to_bigarray(value v, value flags)
 {
@@ -48,5 +49,25 @@ CAMLprim value ml_blit_bigarray_to_string
   char *src = Array_data(Bigarray_val(a), i);
   char *dest = String_val(s) + Long_val(j);
   memcpy(dest, src, Long_val(l));
+  return Val_unit;
+}
+
+CAMLprim value ml_blit_floatarray_to_bigarray
+(value fa, value i, value a, value j, value l)
+{
+  int w = 8;
+  char *src = Bp_val(fa) + Long_val(i)*w;
+  char *dest = Floatarray_data(Bigarray_val(a), j);
+  memcpy(dest, src, Long_val(l)*w);
+  return Val_unit;
+}
+
+CAMLprim value ml_blit_bigarray_to_floatarray
+(value a, value i, value fa, value j, value l)
+{
+  int w = 8;
+  char *src = Floatarray_data(Bigarray_val(a), i);
+  char *dest = Bp_val(fa) + Long_val(j)*w;
+  memcpy(dest, src, Long_val(l)*w);
   return Val_unit;
 }
