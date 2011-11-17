@@ -13,6 +13,7 @@ TARGETS = \
 all:
 	$(OCAMLBUILD) $(OBFLAGS) $(TARGETS)
 
- .PHONY: clean
- clean:
+.PHONY: clean
+clean:
 	$(OCAMLBUILD) -clean
+

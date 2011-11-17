@@ -1,0 +1,6 @@
+<*>: annot
+#"libparmap.a": use_parmap
+<parmap.cm{x,}a>: use_libparmap
+<*.{ml,mli}>: package(extlib), package(unix), package(bigarray)
+
+

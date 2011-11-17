@@ -1,0 +1,92 @@
+VERSION=@PACKAGE_VERSION@
+NAME=@PACKAGE_NAME@
+
+CFLAGS=@CFLAGS@ -fPIC -Wall -pedantic -Werror -Wno-long-long
+CPPFLAGS=@CPPFLAGS@
+LDFLAGS=@LDFLAGS@
+
+OCAMLFIND=@OCAMLFIND@
+OCAMLBUILD=@OCAMLBUILD@
+
+exec_prefix=@prefix@
+LIBDIR=@libdir@/ocaml
+BINDIR=@bindir@
+LIBDIR=$(shell ocamlfind printconf destdir)
+
+INSTALL=$(OCAMLFIND) install -destdir $(LIBDIR)
+UNINSTALL=$(OCAMLFIND) remove -destdir $(LIBDIR)
+
+ifeq ("@OCAMLBEST@","opt")
+  OCAMLBEST=native
+else
+  OCAMLBEST=byte
+endif
+
+DIST_DIR = $(NAME)-$(VERSION)
+DIST_TARBALL = $(DIST_DIR).tar.gz
+
+OBFLAGS = -j 10 -use-ocamlfind #-classic-display
+#OBFLAGS += $(OBFLAGS) -tag debug -tag profile
+
+BYTELIBS = parmap.cma
+OPTLIBS=
+CMXSLIBS=
+ALIBS=
+
+ifeq ("@OCAMLBEST@","opt")
+  OPTLIBS += $(BYTELIBS:%.cma=%.cmxa)
+  CMXSLIBS += $(BYTELIBS:%.cma=%.cmxs)
+endif
+
+ALIBS = $(BYTELIBS:%.cma=%.a)
+
+all:
+	$(OCAMLBUILD) $(OBFLAGS) $(BYTELIBS) $(OPTLIBS) $(CMXSLIBS) $(ALIBS)
+
+fast: 
+	$(OCAMLBUILD) $(OBFLAGS) $(OPTLIBS)
+
+EXAMPLES = \
+  example/simplescale.$(OCAMLBEST) \
+  example/floatscale.$(OCAMLBEST) \
+  example/simplescale_array.$(OCAMLBEST) \
+  example/simplescalefold.$(OCAMLBEST) \
+  example/simplescalemapfold.$(OCAMLBEST) \
+  example/mandels.$(OCAMLBEST)
+
+examples:
+	$(OCAMLBUILD) $(OBFLAGS) $(EXAMPLES)
+
+INSTALL_STUFF = META 
+INSTALL_STUFF += $(wildcard _build/*.cma _build/*.cmxa _build/*.cmxs)
+INSTALL_STUFF += $(wildcard _build/*.mli _build/*.cmi)
+INSTALL_STUFF += $(wildcard _build/*.so _build/*.a)
+
+install: $(LIBS) META
+	test -d $(LIBDIR) || mkdir -p $(LIBDIR)
+	test -d $(LIBDIR)/stublibs || mkdir -p $(LIBDIR)/stublibs
+	$(INSTALL) -patch-version $(VERSION) $(NAME) $(INSTALL_STUFF)
+
+uninstall:
+	$(UNINSTALL) $(NAME)
+
+clean:
+	$(OCAMLBUILD) -clean
+
+dist: ./$(DIST_TARBALL)
+./$(DIST_TARBALL):
+	if [ -d ./$(DIST_DIR)/ ] ; then rm -rf ./$(DIST_DIR)/ ; fi
+	if [ -d ./$(DIST_TARBALL) ] ; then rm -f ./$(DIST_TARBALL) ; fi
+	if [ -d .svn ]; then \
+          svn export . ./$(DIST_DIR) ; \
+        else \
+          mkdir ./$(DIST_DIR)/ ;\
+	  git archive --format=tar HEAD | \
+	  tar -x -C ./$(DIST_DIR)/ ; \
+        fi
+	for f in $(DIST_EXCLUDE) ; do rm -rf ./$(DIST_DIR)/$$f; done
+	tar cvzf ./$(DIST_TARBALL) ./$(DIST_DIR)
+	rm -rf ./$(DIST_DIR)
+	@echo "Distribution tarball: ./$(DIST_TARBALL)"
+
+.PHONY: all fast install clean dist
