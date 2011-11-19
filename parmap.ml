@@ -13,7 +13,6 @@
 
 open ExtLib
 
-
 (* sequence type, subsuming lists and arrays *)
 
 type 'a sequence = L of 'a list | A of 'a array;;
@@ -343,7 +342,9 @@ let array_parmap ?(ncores=1) ?chunksize (f:'a -> 'b) (al:'a array) : 'b array=
      knowledge on the internal representation of arrays and bigarrays.
  *)
 
-let array_float_parmap ?(ncores=1) ?chunksize (f:'a -> float) (al:'a array) : float array=
+exception WrongArraySize
+
+let array_float_parmap ?(ncores=1) ?chunksize ?result (f:'a -> float) (al:'a array) : float array=
   let size = Array.length al in
   let fd = Unix.openfile "/dev/zero" [Unix.O_RDWR; Unix.O_CREAT] 0o600 in
   let arr_out = Bigarray.Array1.map_file fd Bigarray.float64 Bigarray.c_layout true size in
@@ -355,8 +356,16 @@ let array_float_parmap ?(ncores=1) ?chunksize (f:'a -> float) (al:'a array) : fl
       done
     with e -> exc_handler e lo
   in
-  simplemapper ncores compute () al (fun r -> ());
-  let res = Bytearray.to_floatarray arr_out size in
+  mapper ncores ~chunksize compute () al (fun r -> ());
+  let res = 
+    match result with
+      None -> Bytearray.to_floatarray arr_out size
+    | Some a -> 
+	if Array.length a < size then
+	  (info "result array is too small to hold the result in array_float_parmap"; raise WrongArraySize)
+        else
+	  Bytearray.to_this_floatarray a arr_out size
+  in
   Unix.close fd;
   res
 ;;  

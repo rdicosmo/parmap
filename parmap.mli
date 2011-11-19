@@ -69,9 +69,22 @@ val array_parmap : ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a array -> 'b
 
 (** {6 Parallel map on float arrays } *)
 
-val array_float_parmap : ?ncores:int -> ?chunksize:int -> ('a -> float) -> 'a array -> float array
+exception WrongArraySize
+
+val array_float_parmap : ?ncores:int -> ?chunksize:int -> ?result: float array -> ('a -> float) -> 'a array -> float array
   (** [array_float_parmap  ~ncores:n f a ] computes [Array.map f a] 
       by forking [n] processes on a multicore machine, and
-      preallocating the resulting array as shared memory.
-      The optional [chunksize] parameter is ignored, and the
-      result is returned in the original order. *)
+      preallocating the resulting array as shared memory,
+      which allows significantly more efficient computation
+      than calling the generic array_parmap function.
+      In case you already have at hand an array where to store
+      the result, you can squeeze out some more memory cycles
+      by passing it as optional parameter [result]: this will
+      avoid the creation of a result array, which can be costly
+      for very large data sets. Raises WrongArraySize if [result]
+      is too small to small to hold the data.
+      If the optional [chunksize] parameter is specified,
+      the processes compute the result in an on-demand fashion
+      on blochs of size [chunksize]; this provides automatic
+      load balancing for unbalanced computations, *and* the order
+      of the result is still guaranteed to be preserved. *)

@@ -107,6 +107,10 @@ let to_floatarray a l =
   unsafe_blit_to_floatarray a 0 fa 0 l;
   fa
 
+let to_this_floatarray fa a l =
+  unsafe_blit_to_floatarray a 0 fa 0 l;
+  fa
+
 let of_floatarray fa =
   let l = Array.length fa in
   let a = createf l in 

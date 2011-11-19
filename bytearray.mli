@@ -25,6 +25,8 @@ val of_string : string -> t
 
 val to_floatarray : tf -> int -> float array
 
+val to_this_floatarray : float array -> tf -> int -> float array
+
 val of_floatarray : float array -> tf
 
 val sub : t -> int -> int -> string
