@@ -257,7 +257,6 @@ let mapper ncores ~chunksize compute opid al collect =
       collect !res
 ;;
 
-
 (* the parallel mapfold function *)
 
 let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c->'c) (opid:'c) (concat:'c->'c->'c) : 'c=
@@ -344,10 +343,31 @@ let array_parmap ?(ncores=1) ?chunksize (f:'a -> 'b) (al:'a array) : 'b array=
 
 exception WrongArraySize
 
-let array_float_parmap ?(ncores=1) ?chunksize ?result (f:'a -> float) (al:'a array) : float array=
+type buf= (float, Bigarray.float64_elt, Bigarray.c_layout) Bigarray.Array1.t * int;; (* should be a long int some day *)
+
+let init_shared_buffer a = 
+  let size = Array.length a in
+  let fd = tempfd() in
+  let arr = Bigarray.Array1.map_file fd Bigarray.float64 Bigarray.c_layout true size in
+  
+  (* The mmap() function shall add an extra reference to the file associated
+     with the file descriptor fildes which is not removed by a subsequent close()
+     on that file descriptor.
+     http://pubs.opengroup.org/onlinepubs/009695399/functions/mmap.html
+   *)
+  Unix.close fd; (arr,size)
+;;
+
+let array_float_parmap ?(ncores=1) ?chunksize ?result ?sharedbuffer (f:'a -> float) (al:'a array) : float array =
   let size = Array.length al in
-  let fd = Unix.openfile "/dev/zero" [Unix.O_RDWR; Unix.O_CREAT] 0o600 in
-  let arr_out = Bigarray.Array1.map_file fd Bigarray.float64 Bigarray.c_layout true size in
+  let arr_out = 
+    match sharedbuffer with
+      Some (arr,s) -> 
+	if s<size then 
+	  (info "shared buffer is too small to hold the input in array_float_parmap"; raise WrongArraySize)
+	else arr
+    | None -> fst (init_shared_buffer al)
+  in
   let compute _ lo hi _ exc_handler =
     try
       let arr_out = Array.unsafe_get (Obj.magic arr_out) 1 in
@@ -365,9 +385,6 @@ let array_float_parmap ?(ncores=1) ?chunksize ?result (f:'a -> float) (al:'a arr
 	  (info "result array is too small to hold the result in array_float_parmap"; raise WrongArraySize)
         else
 	  Bytearray.to_this_floatarray a arr_out size
-  in
-  Unix.close fd;
-  res
+  in res
 ;;  
-
 

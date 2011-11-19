@@ -71,20 +71,30 @@ val array_parmap : ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a array -> 'b
 
 exception WrongArraySize
 
-val array_float_parmap : ?ncores:int -> ?chunksize:int -> ?result: float array -> ('a -> float) -> 'a array -> float array
-  (** [array_float_parmap  ~ncores:n f a ] computes [Array.map f a] 
-      by forking [n] processes on a multicore machine, and
-      preallocating the resulting array as shared memory,
-      which allows significantly more efficient computation
-      than calling the generic array_parmap function.
-      In case you already have at hand an array where to store
-      the result, you can squeeze out some more memory cycles
-      by passing it as optional parameter [result]: this will
-      avoid the creation of a result array, which can be costly
-      for very large data sets. Raises WrongArraySize if [result]
-      is too small to small to hold the data.
-      If the optional [chunksize] parameter is specified,
-      the processes compute the result in an on-demand fashion
-      on blochs of size [chunksize]; this provides automatic
-      load balancing for unbalanced computations, *and* the order
-      of the result is still guaranteed to be preserved. *)
+type buf
+
+val init_shared_buffer : float array -> buf
+  (** Creates a new shared buffer that can be reused in a series of calls to
+      [array_float_parmap], avoiding the cost of reallocating it each time. *)
+
+val array_float_parmap : ?ncores:int -> ?chunksize:int -> ?result: float array -> ?sharedbuffer: buf -> ('a -> float) -> 'a array -> float array
+  (** [array_float_parmap  ~ncores:n f a ] computes [Array.map f a] by forking 
+      [n] processes on a multicore machine, and preallocating the resulting
+      array as shared memory, which allows significantly more efficient
+      computation than calling the generic array_parmap function.  If the
+      optional [chunksize] parameter is specified, the processes compute the
+      result in an on-demand fashion on blochs of size [chunksize]; this
+      provides automatic load balancing for unbalanced computations, *and* the
+      order of the result is still guaranteed to be preserved.
+
+      In case you already have at hand an array where to store the result, you
+      can squeeze out some more cpu cycles by passing it as optional parameter
+      [result]: this will avoid the creation of a result array, which can be
+      costly for very large data sets. Raises WrongArraySize if [result] is too
+      small to hold the data.
+
+      It is possible to share the same preallocated shared memory space across
+      calls, by initialising the space calling [init_shared_buffer a] and
+      passing the result as the optional [sharedbuffer] parameter to each
+      subsequent call to [array_float_parmap].  Raises WrongArraySize if
+      [sharedbuffer] is too small to hold the input data. *)
