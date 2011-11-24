@@ -1,0 +1,17 @@
+This code started as a two day exercise in July 2011,
+by Marco Danelutto and Roberto Di Cosmo, that produced
+the architecture now contained in simplemapper.
+
+It has evolved significantly after, and is now
+contains a particularly efficient version of the
+map code on float arrays, incorporating ideas from
+Paul Vernaza, and that works thanks to smart code
+and significant insight from Jerome Vouillon.
+
+Pietro Abate provided autoconf and ocamlbuild support.
+
+Detailed contributor history is contained in the
+git repository available at
+
+   https://gitorious.org/parmap
+
