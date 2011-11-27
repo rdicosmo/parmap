@@ -70,6 +70,11 @@ install: $(LIBS) META
 uninstall:
 	$(UNINSTALL) $(NAME)
 
+
+doc:
+        $(OCAMLBUILD) $(OBFLAGS) $(NAME).docdir/index.html $(NAME).docdir/index.dot
+        dot -Grotate=0 -Tsvg -o $(NAME).docdir/index.svg $(NAME).docdir/index.dot
+
 clean:
 	$(OCAMLBUILD) -clean
 
