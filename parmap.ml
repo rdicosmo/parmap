@@ -97,6 +97,9 @@ let simplemapper ncores compute opid al collect =
   let chunksize = ln/ncores in
   (* create descriptors to mmap *)
   let fdarr=Array.init ncores (fun _ -> tempfd()) in
+  (* call the GC before forking *)
+  Gc.compact ();
+  (* spawn children *)
   for i = 0 to ncores-1 do
     match Unix.fork() with
       0 -> 
@@ -179,6 +182,8 @@ let mapper ncores ~chunksize compute opid al collect =
       let pipedown=Array.init ncores (fun _ -> Unix.pipe ()) in
       let pipeup_rd,pipeup_wr=Unix.pipe () in
       let oc_up = Unix.out_channel_of_descr pipeup_wr in
+      (* call the GC before forking *)
+      Gc.compact ();
       (* spawn children *)
       for i = 0 to ncores-1 do
 	match Unix.fork() with
@@ -360,7 +365,7 @@ let init_shared_buffer a =
 
 let array_float_parmap ?(ncores=1) ?chunksize ?result ?sharedbuffer (f:'a -> float) (al:'a array) : float array =
   let size = Array.length al in
-  let arr_out = 
+  let barr_out = 
     match sharedbuffer with
       Some (arr,s) -> 
 	if s<size then 
@@ -368,23 +373,27 @@ let array_float_parmap ?(ncores=1) ?chunksize ?result ?sharedbuffer (f:'a -> flo
 	else arr
     | None -> fst (init_shared_buffer al)
   in
+  (* trick the compiler into accessing the Bigarray memory area as a float array:
+     the data in Bigarray is placed at offset 1 w.r.t. a normal array, so we
+     get a pointer to that zone into arr_out_as_array, and have it typed as a float
+     array *)
+  let barr_out_as_array = Array.unsafe_get (Obj.magic barr_out) 1 in
   let compute _ lo hi _ exc_handler =
     try
-      let arr_out = Array.unsafe_get (Obj.magic arr_out) 1 in
       for i=lo to hi do 
-	Array.unsafe_set arr_out i (f (Array.unsafe_get al i)) 
+	Array.unsafe_set barr_out_as_array i (f (Array.unsafe_get al i)) 
       done
     with e -> exc_handler e lo
   in
   mapper ncores ~chunksize compute () al (fun r -> ());
   let res = 
     match result with
-      None -> Bytearray.to_floatarray arr_out size
+      None -> Bytearray.to_floatarray barr_out size
     | Some a -> 
 	if Array.length a < size then
 	  (info "result array is too small to hold the result in array_float_parmap"; raise WrongArraySize)
         else
-	  Bytearray.to_this_floatarray a arr_out size
+	  Bytearray.to_this_floatarray a barr_out size
   in res
 ;;  
 
