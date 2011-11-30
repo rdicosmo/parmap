@@ -37,10 +37,10 @@ far as your computation  inside the map/fold  does not produce side effects that
 need  to be  preserved, the  final result will   be the same  as  performing the
 sequential operation, the only difference is that you might get it faster.
 
-The OCaml code is quite simple and does not rely on any  external C library: all
-the magic is done by your operating system's fork and memory mapping mechanisms.
-One could gain some speed by implementing a marshal/unmarshal operation directly
-on bigarrays, but we did not do this yet.
+The OCaml  code is reasonably  simple and  only marginally relies  on external C
+libraries: most of the magic is done by your operating  system's fork and memory
+mapping   mechanisms.    One    could gain  some      speed  by implementing   a
+marshal/unmarshal operation directly on bigarrays, but we did not do this yet.
 
 Of course, if you happen  to have open  channels, or files, or other connections
 that should only be  used by the parent  process, your program  may behave in  a
