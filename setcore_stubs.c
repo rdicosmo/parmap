@@ -7,6 +7,7 @@
 #include "config.h"
 
 CAMLprim value setcore(value which) {
+#ifdef HAVE_DECL_SCHED_SETAFFINITY
   int numcores = sysconf( _SC_NPROCESSORS_ONLN );
   int w = Int_val(which) % numcores; // stay in the space of existing cores
   cpu_set_t cpus;   
@@ -14,7 +15,6 @@ CAMLprim value setcore(value which) {
   int finished=0;
   while (finished==0)
     {
-#ifdef HAVE_DECL_SCHED_SETAFFINITY
       CPU_ZERO(&cpus); 
       CPU_SET (w,&cpus);
       //fprintf(stderr,"Trying to pin to cpu %d out of %d reported by the system\n",w,numcores);
@@ -27,9 +27,7 @@ CAMLprim value setcore(value which) {
 	{ //fprintf(stderr,"Succeeded pinning to cpu %d\n",w); 
 	  finished=1;
 	}
-#else
-      finished=1;
-#endif
     }
+#endif
   return Val_unit;
 }
