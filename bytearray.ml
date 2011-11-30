@@ -54,6 +54,12 @@ let of_string s =
   unsafe_blit_from_string s 0 a 0 l;
   a
 
+let mmap_of_string fd s =
+  let l = String.length s in
+  let ba = Bigarray.Array1.map_file fd Bigarray.char Bigarray.c_layout true l in
+  unsafe_blit_from_string s 0 ba 0 l;
+  ba
+
 let sub a ofs len =
   if
     ofs < 0 || len < 0 || ofs > length a - len || len > Sys.max_string_length

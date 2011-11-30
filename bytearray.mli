@@ -23,6 +23,8 @@ val to_string : t -> string
 
 val of_string : string -> t
 
+val mmap_of_string : Unix.file_descr -> string -> t
+
 val to_floatarray : tf -> int -> float array
 
 val to_this_floatarray : float array -> tf -> int -> float array

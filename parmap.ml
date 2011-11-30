@@ -13,6 +13,12 @@
 
 open ExtLib
 
+(* OS related constants *)
+
+(* this is a reasonable size for mmapping a file to contain the result data *)
+let huge_size = if Sys.word_size = 32 then 1 lsl 32 else 1 lsl 26;;
+
+
 (* sequence type, subsuming lists and arrays *)
 
 type 'a sequence = L of 'a list | A of 'a array;;
@@ -71,11 +77,24 @@ let unmarshal fd =
 
 (* marshal to a mmap seen as a bigarray *)
 
+(* System dependent notes:
+    - on Linux kernels, we might allocate a mmapped memory area of huge_size and marshal into it directly
+
+       let ba = Bigarray.Array1.map_file fd Bigarray.char Bigarray.c_layout true huge_size in
+       ignore(Bytearray.marshal_to_buffer ba 0 v [Marshal.Closures]);
+       Unix.close fd
+
+    - to be compatible with other systems, notably Mac OS X, which insist in allocating *all*
+      the declared memory area even for a sparse file, we must choose a less efficient approach:  
+       * marshal the value v to a string s, and compute its size
+       * allocate a mmap of that exact size,
+       * copy the string to that mmap
+      this allocates twice as much memory, and incurs an extra copy of the value v 
+ *)
+
 let marshal fd v = 
-  let huge_size = 1 lsl 32 in
-  let ba = Bigarray.Array1.map_file fd Bigarray.char Bigarray.c_layout true huge_size in
-  ignore(Bytearray.marshal_to_buffer ba 0 v [Marshal.Closures]);
-  Unix.close fd
+  let s = Marshal.to_string v [Marshal.Closures] in
+  ignore(Bytearray.mmap_of_string fd s)
 
 (* create a shadow file descriptor *)
 
