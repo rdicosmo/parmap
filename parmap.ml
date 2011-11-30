@@ -15,9 +15,8 @@ open ExtLib
 
 (* OS related constants *)
 
-(* this is a reasonable size for mmapping a file to contain the result data *)
-let huge_size = if Sys.word_size = 32 then 1 lsl 32 else 1 lsl 26;;
-
+(* a reasonable size for mmapping a file containing even huge result data *)
+let huge_size = if Sys.word_size = 64 then 1 lsl 32 else 1 lsl 26;;
 
 (* sequence type, subsuming lists and arrays *)
 
@@ -45,15 +44,6 @@ let ext_intv startv endv =
   let s,e = (min startv endv),(max startv endv) in
   let rec aux acc = function n -> if n=s then n::acc else aux (n::acc) (n-1)
   in aux [] e
-;;
-
-(* find index of the first occurrence of an element in a list *)
-
-let index_of e l =
-  let rec aux = function
-      ([],_) -> raise Not_found
-    | (a::r,n) -> if a=e then n else aux (r,n+1)
-  in aux (l,0)
 ;;
 
 (* freopen emulation, from Xavier's suggestion on OCaml mailing list *)
