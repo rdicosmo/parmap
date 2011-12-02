@@ -4,8 +4,15 @@
    you don't. */
 #undef HAVE_DECL_SCHED_SETAFFINITY
 
+/* Define to 1 if you have the declaration of `thread_policy_set', and to 0 if
+   you don't. */
+#undef HAVE_DECL_THREAD_POLICY_SET
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
+
+/* Define to 1 if you have the <mach/thread_policy.h> header file. */
+#undef HAVE_MACH_THREAD_POLICY_H
 
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
