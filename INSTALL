@@ -6,3 +6,11 @@ To uninstall, type
 
 make uninstall
 
+To compile from git, do this first :
+
+aclocal -I m4
+autoconf
+autoheader
+./configure
+make
+

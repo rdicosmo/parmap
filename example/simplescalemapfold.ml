@@ -36,7 +36,7 @@ let scale_test iter nprocmin nprocmax =
     let tot=ref 0.0 in
     for j=1 to iter do
       let d=Unix.gettimeofday() in
-      let cl'=parmapfold ~ncores:(i*2) compute (L l) (+) 0 (+) in
+      let cl'=parmapfold ~ncores:(i*2) ~chunksize:100 compute (L l) (+) 0 (+) in
       tot:=!tot+.(Unix.gettimeofday()-.d);
       if cl<>cl' then Printf.eprintf "Parmap failure: result mismatch\n"
     done;

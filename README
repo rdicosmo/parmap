@@ -37,16 +37,25 @@ far as your computation  inside the map/fold  does not produce side effects that
 need  to be  preserved, the  final result will   be the same  as  performing the
 sequential operation, the only difference is that you might get it faster.
 
-The OCaml code is quite simple and does not rely on any  external C library: all
-the magic is done by your operating system's fork and memory mapping mechanisms.
-One could gain some speed by implementing a marshal/unmarshal operation directly
-on bigarrays, but we did not do this yet.
+The OCaml  code is reasonably  simple and  only marginally relies  on external C
+libraries: most of the magic is done by your operating  system's fork and memory
+mapping   mechanisms.    One    could gain  some      speed  by implementing   a
+marshal/unmarshal operation directly on bigarrays, but we did not do this yet.
 
 Of course, if you happen  to have open  channels, or files, or other connections
 that should only be  used by the parent  process, your program  may behave in  a
 very wierd way: as an example, *do  not* open a  graphic window before calling a
 Parmap primitive, and   *do   not*  use  this  library   if  your  program    is
 multi-threaded!
+
+Pinning processes to physical CPUs
+----------------------------------
+
+To obtain maximum  speed,  Parmap tries to  pin  the worker processes to  a CPU,
+using  the scheduler  affinity  interface  that is  available   in recent  Linux
+kernels.   Similar functionality may be  obtained  on different platforms  using
+slightly different API. Contributions  are welcome to  support those other APIs,
+just make sure that you use autoconf properly.
 
 Using Parmap with Ocamlnat
 --------------------------
@@ -71,3 +80,47 @@ Parmap.parmap f l are not necessarily in the same order as List.map f l.
 In general, using little chunksize helps in balancing the load among the workers,
 and provides better speed, at the price of losing the ordering: there is a
 tradeoff, and it is up to the user to choose the solution that better suits him/her.
+
+Fast map on arrays and on float arrays
+--------------------------------------
+
+Visiting an array is much faster than visiting a list, and conversion of an array
+to and from a list is expensive, on large data structures, so we provide a specialised
+version of map on arrays, that beaves exactly like parmap.
+
+We also provide a highly optimised specialised parmap version that is targeted
+to float arrays, array_float_parmap, that allows you to perform parallel
+computation on very large float arrays efficiently, without the boxing/unboxing
+overhead introduced by the other primitives, including array_parmap.
+
+To understand the efficiency issues involved in the case of large arrays of float,
+here is a short summary of the steps that any implementation of a parallel map
+function must perform.
+
+  1) create a float array to hold the result of the computation.
+     This operation is expensive: on an Intel i7, creating a 10M float array
+     takes 50 milliseconds
+
+     ocamlnat
+          Objective Caml version 3.12.0 - native toplevel
+
+     # #load "unix.cmxs";;
+     # let d = Unix.gettimeofday() in ignore(Array.create 10000000 0.); Unix.gettimeofday() -. d;;
+     - : float = 0.0501301288604736328
+
+  2) create a shared memory area 
+
+  3) possibly copy the result array to the shared memory area
+
+  4) perform the computation in the children writing the result in the shared memory area
+
+  5) possibly copy the result back to the OCaml array
+
+All implementations need to do 1, 2 and 4; steps 3 and/or 5 may be omitted depending on
+what the user wants to do with the result.
+
+The array_float_parmap performs steps 1,2,4 and 5. It is possible to share steps
+1 and 2 among subsequent calls to the parallel function by preallocating the result
+array and the shared memory buffer, and passing them as optional parameters to the
+array_float_parmap function: this may save a significant amount of time if the
+array is very large.

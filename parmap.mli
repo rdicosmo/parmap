@@ -5,18 +5,34 @@
 (*                                                                        *)
 (*  This library is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU Lesser General Public License as        *)
-(*  published by the Free Software Foundation, either version 3 of the    *)
+(*  published by the Free Software Foundation, either version 2 of the    *)
 (*  License, or (at your option) any later version.  A special linking    *)
 (*  exception to the GNU Lesser General Public License applies to this    *)
 (*  library, see the LICENSE file for more information.                   *)
 (**************************************************************************)
 
-(** Module [Parmap]: parallel map on multicores. *)
+(** Module [Parmap]: efficient parallel map, fold and mapfold on lists and 
+    arrays on multicores. 
+
+    All the primitives allow to control the granularity of the parallelism 
+    via an optional parameter [chunksize]: if [chunksize] is omitted, the
+    input sequence is split evenly among the available cores; if [chunksize]
+    is specified, the input data is split in chunks of size [chunksize] and
+    dispatched to the available cores using an on demand strategy that 
+    ensures automatic load balancing.
+
+    A specific primitive [array_float_parmap] is provided for fast operations on float arrays.
+    *)
 
 (** {6 Sequence type, subsuming lists and arrays} *)
 
 type 'a sequence = L of 'a list | A of 'a array;;
 
+(** The [parmapfold], [parfold] and [parmap] generic functions, for efficiency reasons,
+    convert the input data into an array internally, so we provide the ['a sequence] type
+    to allow passing an array directly as input.
+    If you want to perform a parallel map operation on an array, use [array_parmap] or [array_float_parmap] instead.
+    *)
 
 (** {6 Parallel mapfold} *)
 
@@ -28,10 +44,14 @@ val parmapfold : ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a sequence -> (
       fold computed on each core. If 'b = 'c, then [concat] may be simply [op]. 
       The order of computation in parallel changes w.r.t. sequential execution, so this 
       function is only correct if [op] and [concat] are associative and commutative.
+      If the optional [chunksize] parameter is specified,
+      the processes compute the result in an on-demand fashion
+      on blocks of size [chunksize].
       [parmapfold ~ncores:n f (A a) op b concat ] computes [Array.fold_right op (Array.map f a) b] 
       *)
 
 (** {6 Parallel fold} *)
+
 val parfold: ?ncores:int -> ?chunksize:int -> ('a -> 'b -> 'b) -> 'a sequence -> 'b -> ('b->'b->'b) -> 'b
   (** [parfold ~ncores:n op (L l) b concat] computes [List.fold_right op l b] 
       by forking [n] processes on a multicore machine.
@@ -39,6 +59,9 @@ val parfold: ?ncores:int -> ?chunksize:int -> ('a -> 'b -> 'b) -> 'a sequence ->
       fold computed on each core. If 'b = 'c, then [concat] may be simply [op]. 
       The order of computation in parallel changes w.r.t. sequential execution, so this 
       function is only correct if [op] and [concat] are associative and commutative.
+      If the optional [chunksize] parameter is specified,
+      the processes compute the result in an on-demand fashion
+      on blocks of size [chunksize].
       [parfold ~ncores:n op (A a) b concat] similarly computes [Array.fold_right op a b].
       *)
 
@@ -48,4 +71,53 @@ val parmap : ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a sequence -> 'b li
   (** [parmap  ~ncores:n f (L l) ] computes [List.map f l] 
       by forking [n] processes on a multicore machine.
       [parmap  ~ncores:n f (A a) ] computes [Array.map f a] 
-      by forking [n] processes on a multicore machine. *)
+      by forking [n] processes on a multicore machine.
+      If the optional [chunksize] parameter is specified,
+      the processes compute the result in an on-demand fashion
+      on blocks of size [chunksize]; this provides automatic
+      load balancing for unbalanced computations, but the order
+      of the result is no longer guaranteed to be preserved. *)
+
+
+(** {6 Parallel map on arrays} *)
+
+val array_parmap : ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a array -> 'b array
+  (** [array_parmap  ~ncores:n f a ] computes [Array.map f a] 
+      by forking [n] processes on a multicore machine.
+      If the optional [chunksize] parameter is specified,
+      the processes compute the result in an on-demand fashion
+      on blochs of size [chunksize]; this provides automatic
+      load balancing for unbalanced computations, but the order
+      of the result is no longer guaranteed to be preserved. *)
+
+(** {6 Parallel map on float arrays } *)
+
+exception WrongArraySize
+
+type buf
+
+val init_shared_buffer : float array -> buf
+  (** [init_shared_buffer a] creates a new memory mapped shared buffer big enough to hold a float array of the size of [a].
+      This buffer can be reused in a series of calls to [array_float_parmap], avoiding the cost of reallocating it each time. *)
+
+val array_float_parmap : ?ncores:int -> ?chunksize:int -> ?result: float array -> ?sharedbuffer: buf -> ('a -> float) -> 'a array -> float array
+  (** [array_float_parmap  ~ncores:n f a ] computes [Array.map f a] by forking 
+      [n] processes on a multicore machine, and preallocating the resulting
+      array as shared memory, which allows significantly more efficient
+      computation than calling the generic array_parmap function.  If the
+      optional [chunksize] parameter is specified, the processes compute the
+      result in an on-demand fashion on blochs of size [chunksize]; this
+      provides automatic load balancing for unbalanced computations, *and* the
+      order of the result is still guaranteed to be preserved.
+
+      In case you already have at hand an array where to store the result, you
+      can squeeze out some more cpu cycles by passing it as optional parameter
+      [result]: this will avoid the creation of a result array, which can be
+      costly for very large data sets. Raises [WrongArraySize] if [result] is too
+      small to hold the data.
+
+      It is possible to share the same preallocated shared memory space across
+      calls, by initialising the space calling [init_shared_buffer a] and
+      passing the result as the optional [sharedbuffer] parameter to each
+      subsequent call to [array_float_parmap].  Raises WrongArraySize if
+      [sharedbuffer] is too small to hold the input data. *)

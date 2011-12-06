@@ -1,27 +1,27 @@
-(* Unison file synchronizer: src/bytearray.ml *)
-(* Copyright 1999-2010, Benjamin C. Pierce 
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*)
+(***************************************************************************)
+(* bytearray.ml : functions for efficient marshaling to and from bigarrays *)
+(*                                                                         *)
+(* Copyright 1999-2011, Jérôme Vouillon                                    *)
+(*                                                                         *)
+(*  This library is free software: you can redistribute it and/or modify   *)
+(*  it under the terms of the GNU Lesser General Public License as         *)
+(*  published by the Free Software Foundation, either version 2 of the     *)
+(*  License, or (at your option) any later version.  A special linking     *)
+(*  exception to the GNU Lesser General Public License applies to this     *)
+(*  library, see the LICENSE file for more information.                    *)
+(***************************************************************************)
 
 open Bigarray
 
 type t = (char, int8_unsigned_elt, c_layout) Array1.t
 
+type tf = (float, float64_elt, c_layout) Array1.t
+
 let length = Bigarray.Array1.dim
 
 let create l = Bigarray.Array1.create Bigarray.char Bigarray.c_layout l
+
+let createf l = Bigarray.Array1.create Bigarray.float64 Bigarray.c_layout l
 
 (*
 let unsafe_blit_from_string s i a j l =
@@ -53,6 +53,12 @@ let of_string s =
   let a = create l in
   unsafe_blit_from_string s 0 a 0 l;
   a
+
+let mmap_of_string fd s =
+  let l = String.length s in
+  let ba = Bigarray.Array1.map_file fd Bigarray.char Bigarray.c_layout true l in
+  unsafe_blit_from_string s 0 ba 0 l;
+  ba
 
 let sub a ofs len =
   if
@@ -95,3 +101,24 @@ external marshal_to_buffer : t -> int -> 'a -> Marshal.extern_flags list -> int
 
 external unmarshal : t -> int -> 'a
   = "ml_unmarshal_from_bigarray"
+
+external unsafe_blit_from_floatarray : float array -> int -> tf -> int -> int -> unit
+  = "ml_blit_floatarray_to_bigarray" "noalloc"
+
+external unsafe_blit_to_floatarray : tf -> int -> float array -> int -> int -> unit
+  = "ml_blit_bigarray_to_floatarray" "noalloc"
+
+let to_floatarray a l =
+  let fa = Obj.obj (Obj.new_block Obj.double_array_tag l) in
+  unsafe_blit_to_floatarray a 0 fa 0 l;
+  fa
+
+let to_this_floatarray fa a l =
+  unsafe_blit_to_floatarray a 0 fa 0 l;
+  fa
+
+let of_floatarray fa =
+  let l = Array.length fa in
+  let a = createf l in 
+  unsafe_blit_from_floatarray fa 0 a 0 l;
+  a

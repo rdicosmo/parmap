@@ -11,7 +11,7 @@
 (**************************************************************************)
 
 open Parmap
-
+open Utils
 let initsegm n = let rec aux acc = function 0 -> acc | n -> aux (n::acc) (n-1) in aux [] n
 ;;
 

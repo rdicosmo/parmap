@@ -1,20 +1,19 @@
-all: simplescale.native simplescale_array.native simplescalefold.native simplescalemapfold.native mandels.native
+OCAMLBUILD=ocamlbuild
+OBFLAGS := -j 10 -use-ocamlfind
+OCAMLBEST=native
 
-simplescale.native: simplescale.ml
-	ocamlfind ocamlopt -o simplescale.native -package "extlib parmap" -linkpkg simplescale.ml
+TARGETS = \
+  simplescale.$(OCAMLBEST) \
+  floatscale.$(OCAMLBEST) \
+  simplescale_array.$(OCAMLBEST) \
+  simplescalefold.$(OCAMLBEST) \
+  simplescalemapfold.$(OCAMLBEST) \
+  mandels.$(OCAMLBEST)
 
-simplescale_array.native: simplescale_array.ml
-	ocamlfind ocamlopt -o simplescale_array.native -package "extlib parmap" -linkpkg simplescale_array.ml
-
-simplescalefold.native: simplescalefold.ml
-	ocamlfind ocamlopt -o simplescalefold.native -package "extlib parmap" -linkpkg simplescalefold.ml
-
-simplescalemapfold.native: simplescalemapfold.ml
-	ocamlfind ocamlopt -o simplescalemapfold.native -package "extlib parmap" -linkpkg simplescalemapfold.ml
-
-mandels.native: mandels.ml
-	ocamlfind ocamlopt -o mandels.native -package "extlib graphics parmap" -linkpkg mandels.ml
+all:
+	$(OCAMLBUILD) $(OBFLAGS) $(TARGETS)
 
 .PHONY: clean
 clean:
-	rm -f *.native *.cmi *.cmo *.cmx *.cma *.cmxa *.a *.o *~
+	$(OCAMLBUILD) -clean
+

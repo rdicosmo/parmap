@@ -11,6 +11,7 @@
 (**************************************************************************)
 
 open Graphics;;
+open Utils;;
 
 let n   = 1000;; (* the size of the square screen windows in pixels      *)
 let res = 1000;; (* the resolution: maximum number of iterations allowed *)
@@ -85,7 +86,7 @@ let tasks =
 
 let draw res =
   open_graph (" "^(string_of_int n)^"x"^(string_of_int n));
-  List.iter show_a_result res; close_graph();;
+  List.iter show_a_result res;;
 
 (* compute the image *)
 
@@ -98,6 +99,5 @@ let m=scale_test ~inorder:false ~chunksize:1 pixel (Parmap.L tasks) 2 1 8;;
 (* draw the image *)
 
 draw m;;
-
 ignore(input_line stdin);;
-
+close_graph();;

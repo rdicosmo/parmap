@@ -1,0 +1,41 @@
+AC_INIT(parmap, 0.9.8, roberto@dicosmo.org)
+
+AC_PROG_OCAML
+if test "$OCAMLC" = "no"; then
+ AC_MSG_ERROR([You must install the OCaml compiler])
+fi
+
+AC_PROG_CAMLP4
+AC_SUBST(CAMLP4O)
+if test "$CAMLP4" = "no"; then
+ AC_MSG_ERROR([You must install the Camlp4 pre-processor])
+fi
+
+AC_PROG_FINDLIB
+AC_SUBST(OCAMLFIND)
+if test "$OCAMLFIND" = "no"; then
+ AC_MSG_ERROR([You must install OCaml findlib (the ocamlfind command)])
+fi
+
+AC_CHECK_OCAML_PKG([extlib])
+if test "$OCAML_PKG_extlib" = "no"; then
+ AC_MSG_ERROR([Please install OCaml findlib module 'extlib'.])
+fi
+
+AC_HEADER_STDC
+AC_CHECK_HEADERS([sched.h])
+AC_CHECK_DECLS([sched_setaffinity], [], [], [[
+                #define _GNU_SOURCE 1
+                #include <sched.h>
+                ]])
+
+AC_CHECK_HEADERS([mach/thread_policy.h])
+AC_CHECK_DECLS([thread_policy_set], [], [], [[
+                #include <mach/mach_init.h>
+                #include <mach/thread_policy.h>
+                ]])
+
+AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_FILES([Makefile])
+AC_OUTPUT
+
