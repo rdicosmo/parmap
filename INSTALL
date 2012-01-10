@@ -1,6 +1,6 @@
 To install this program, just type
 
-make; make install
+./configure; make; make install
 
 To uninstall, type
 
