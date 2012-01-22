@@ -36,6 +36,16 @@ AC_CHECK_DECLS([thread_policy_set], [], [], [[
                 ]])
 
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_FILES([Makefile])
+
+AC_CHECK_TOOL([OCAMLBUILD],[ocamlbuild],[no])
+if test "$OCAMLBUILD" = "no"; then
+  AC_MSG_RESULT(OCamlbuild not found. Use pre-ocaml 3.12 Makefile)
+  AC_CONFIG_FILES([Makefile_3.11])
+  mv Makefile_3.11 Makefile
+else
+  AC_MSG_RESULT(OCamlbuild found. Use standard Makefile)
+  AC_CONFIG_FILES([Makefile])
+fi
+
 AC_OUTPUT
 

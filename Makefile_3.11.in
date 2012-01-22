@@ -1,4 +1,10 @@
-NAME = parmap
+VERSION=@PACKAGE_VERSION@
+NAME=@PACKAGE_NAME@
+
+CFLAGS=@CFLAGS@ -fPIC -Wall -pedantic -Werror -Wno-long-long
+CPPFLAGS=@CPPFLAGS@
+LDFLAGS=@LDFLAGS@
+
 OBJS = bytearray $(NAME)
 INTF = $(foreach obj, $(OBJS),$(obj).cmi) setcore.cmi
 C_OBJS = bytearray_stubs.o setcore_stubs.o
