@@ -25,26 +25,26 @@ fi
 AC_HEADER_STDC
 AC_CHECK_HEADERS([sched.h])
 AC_CHECK_DECLS([sched_setaffinity], [], [], [[
-                #define _GNU_SOURCE 1
-                #include <sched.h>
-                ]])
+#define _GNU_SOURCE 1
+#include <sched.h>
+]])
 
 AC_CHECK_HEADERS([mach/thread_policy.h])
 AC_CHECK_DECLS([thread_policy_set], [], [], [[
-                #include <mach/mach_init.h>
-                #include <mach/thread_policy.h>
-                ]])
+#include <mach/mach_init.h>
+#include <mach/thread_policy.h>
+]])
 
 AC_CONFIG_HEADERS([config.h])
 
-AC_CHECK_TOOL([OCAMLBUILD],[ocamlbuild],[no])
-if test "$OCAMLBUILD" = "no"; then
-  AC_MSG_RESULT(OCamlbuild not found. Use pre-ocaml 3.12 Makefile)
+t=`$OCAMLBUILD -use-ocamlfind &> /dev/null; echo $?`
+if test $t == 0 ; then
+  AC_MSG_RESULT(ocaml version $OCAMLVERSION. Use standard Makefile)
+  AC_CONFIG_FILES([Makefile])
+else
+  AC_MSG_RESULT(ocamlbuild does not exists or it does not support -use-ocamlfind)
   AC_CONFIG_FILES([Makefile_3.11])
   mv Makefile_3.11 Makefile
-else
-  AC_MSG_RESULT(OCamlbuild found. Use standard Makefile)
-  AC_CONFIG_FILES([Makefile])
 fi
 
 AC_OUTPUT
