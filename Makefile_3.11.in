@@ -11,8 +11,8 @@ C_OBJS = bytearray_stubs.o setcore_stubs.o
 OBJECTS  = $(foreach obj, $(OBJS),$(obj).cmo)
 XOBJECTS = $(foreach obj, $(OBJS),$(obj).cmx)
 LIBS = $(NAME).cma $(NAME).cmxa $(NAME).cmxs
-OCAMLC   = ocamlfind ocamlc -annot
-OCAMLOPT = ocamlfind ocamlopt -annot
+OCAMLC   = ocamlfind ocamlc
+OCAMLOPT = ocamlfind ocamlopt
 OCAMLMKLIB = ocamlmklib
 OCAMLDEP = ocamldep
 
@@ -22,7 +22,7 @@ SARCHIVE = $(NAME).cmxs
 
 REQUIRES = extlib unix bigarray 
 
-all: $(ARCHIVE) $(XARCHIVE) $(SARCHIVE)
+all: $(ARCHIVE) $(XARCHIVE)
 
 .PHONY: reinstall
 

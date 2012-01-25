@@ -41,11 +41,12 @@ t=`$OCAMLBUILD -use-ocamlfind &> /dev/null; echo $?`
 if test $t == 0 ; then
   AC_MSG_RESULT(ocaml version $OCAMLVERSION. Use standard Makefile)
   AC_CONFIG_FILES([Makefile])
+  AC_OUTPUT
 else
   AC_MSG_RESULT(ocamlbuild does not exists or it does not support -use-ocamlfind)
   AC_CONFIG_FILES([Makefile_3.11])
+  AC_OUTPUT
   mv Makefile_3.11 Makefile
 fi
 
-AC_OUTPUT
 
