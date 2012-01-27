@@ -11,8 +11,6 @@
 (*  library, see the LICENSE file for more information.                   *)
 (**************************************************************************)
 
-open ExtLib
-
 (* OS related constants *)
 
 (* a reasonable size for mmapping a file containing even huge result data *)
@@ -37,6 +35,29 @@ let info fmt =
   Printf.kprintf (fun s -> Format.eprintf "[Parmap]: %s@." s) fmt
 
 (* utils *)
+
+(* tail recursive version of List.concat *)
+
+let concat (l: 'a list) = List.fold_left (fun acc l -> l@acc) [] (List.rev l)
+
+(* tail recursive version of List.fold_right from ExtLib *)
+
+let fold_right_max = 1000
+
+let fold_right f l init =
+        let rec tail_loop acc = function
+                | [] -> acc
+                | h :: t -> tail_loop (f h acc) t
+        in
+        let rec loop n = function
+                | [] -> init
+                | h :: t ->
+                        if n < fold_right_max then
+                                f h (loop (n+1) t)
+                        else
+                                f h (tail_loop init (List.rev t))
+        in
+        loop 0 l
 
 (* would be [? a | a <- startv--endv] using list comprehension from Batteries *)
 
@@ -302,7 +323,7 @@ let parmap ?(ncores=1) ?chunksize (f:'a -> 'b) (s:'a sequence) : 'b list=
 	| n ->  aux ((f' n)::acc) (n-1)
     in aux previous (hi-lo)
   in
-  mapper ncores ~chunksize compute [] al  (fun r -> ExtLib.List.concat r)
+  mapper ncores ~chunksize compute [] al  (fun r -> concat r)
 ;;
 
 (* the parallel fold function *)

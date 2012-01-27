@@ -15,12 +15,13 @@ OCAMLC   = ocamlfind ocamlc
 OCAMLOPT = ocamlfind ocamlopt
 OCAMLMKLIB = ocamlmklib
 OCAMLDEP = ocamldep
+COMPOPTS = -linkpkg -package bigarray -package parmap -package unix 
 
 ARCHIVE  = $(NAME).cma
 XARCHIVE = $(NAME).cmxa
 SARCHIVE = $(NAME).cmxs
 
-REQUIRES = extlib unix bigarray 
+REQUIRES = unix bigarray 
 
 all: $(ARCHIVE) $(XARCHIVE)
 

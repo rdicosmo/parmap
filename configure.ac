@@ -17,11 +17,6 @@ if test "$OCAMLFIND" = "no"; then
  AC_MSG_ERROR([You must install OCaml findlib (the ocamlfind command)])
 fi
 
-AC_CHECK_OCAML_PKG([extlib])
-if test "$OCAML_PKG_extlib" = "no"; then
- AC_MSG_ERROR([Please install OCaml findlib module 'extlib'.])
-fi
-
 AC_HEADER_STDC
 AC_CHECK_HEADERS([sched.h])
 AC_CHECK_DECLS([sched_setaffinity], [], [], [[
