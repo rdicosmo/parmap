@@ -46,16 +46,22 @@ all:
 fast: 
 	$(OCAMLBUILD) $(OBFLAGS) $(OPTLIBS)
 
+TESTS = \
+  tests/simplescale.$(OCAMLBEST) \
+  tests/floatscale.$(OCAMLBEST) \
+  tests/simplescale_array.$(OCAMLBEST) \
+  tests/simplescalefold.$(OCAMLBEST) \
+  tests/simplescalemapfold.$(OCAMLBEST)
+
+tests:
+	$(OCAMLBUILD) $(OBFLAGS) $(TESTS)
+
 EXAMPLES = \
-  example/simplescale.$(OCAMLBEST) \
-  example/floatscale.$(OCAMLBEST) \
-  example/simplescale_array.$(OCAMLBEST) \
-  example/simplescalefold.$(OCAMLBEST) \
-  example/simplescalemapfold.$(OCAMLBEST) \
   example/mandels.$(OCAMLBEST)
 
 examples:
 	$(OCAMLBUILD) $(OBFLAGS) $(EXAMPLES)
+
 
 INSTALL_STUFF = META 
 INSTALL_STUFF += $(wildcard _build/*.cma _build/*.cmxa _build/*.cmxs)
@@ -94,4 +100,4 @@ dist: ./$(DIST_TARBALL)
 	rm -rf ./$(DIST_DIR)
 	@echo "Distribution tarball: ./$(DIST_TARBALL)"
 
-.PHONY: all fast install clean dist
+.PHONY: all fast install clean dist examples tests

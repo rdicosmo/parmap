@@ -1,4 +1,3 @@
 <*>: package(unix), package(bigarray), package(parmap)
-<mandels.*>: package(graphics)
 
 

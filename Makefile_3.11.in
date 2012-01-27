@@ -53,6 +53,16 @@ bytearray_stubs.o: bytearray_stubs.c
 setcore_stubs.o: setcore_stubs.c
 	ocamlc -c -cc "gcc -D_GNU_SOURCE -o setcore_stubs.o -fPIC" setcore_stubs.c
 
+tests:
+	cd tests; $(OCAMLOPT) $(COMPOPTS) utils.ml simplescale.ml -o simplescale.native
+	cd tests; $(OCAMLOPT) $(COMPOPTS) utils.ml floatscale.ml -o floatscale.native
+	cd tests; $(OCAMLOPT) $(COMPOPTS) utils.ml simplescalefold.ml -o simplescalefold.native
+	cd tests; $(OCAMLOPT) $(COMPOPTS) utils.ml simplescalemapfold.ml -o simplescalemapfold.native
+	cd tests; $(OCAMLOPT) $(COMPOPTS) utils.ml simplescale_array.ml -o simplescale_array.native
+
+examples:
+	$(OCAMLOPT) $(COMPOPTS) graphics.cmxa example/mandels.ml -o example/mandels.native
+
 .SUFFIXES: .cmo .cmi .cmx .ml .mli
 
 .ml.cmo:
@@ -67,6 +77,6 @@ depend: *.ml *.mli
 
 include .depend
 
-.PHONY: clean
+.PHONY: clean examples tests
 clean:
 	rm -f *.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs *.a *.o *.so *.annot

@@ -11,7 +11,6 @@
 (**************************************************************************)
 
 open Graphics;;
-open Utils;;
 
 let n   = 1000;; (* the size of the square screen windows in pixels      *)
 let res = 1000;; (* the resolution: maximum number of iterations allowed *)
@@ -90,14 +89,12 @@ let draw res =
 
 (* compute the image *)
 
-Printf.printf "*** Testing with coarse granularity\n";;
-let m=scale_test pixel (Parmap.L tasks) 2 1 8;;
-
-Printf.printf "*** Testing with chunksize=1\n";;
-let m=scale_test ~inorder:false ~chunksize:1 pixel (Parmap.L tasks) 2 1 8;;
+Printf.printf "*** Computing\n%!";;
+let m=Parmap.parmap ~ncores:4 ~chunksize: 1 pixel (Parmap.L tasks);;
 
 (* draw the image *)
 
+Printf.printf "*** Drawing... hit newline to finish\n%!";;
 draw m;;
 ignore(input_line stdin);;
 close_graph();;
