@@ -35,31 +35,31 @@ Printf.printf "*** Computations on integer lists\n";
 
 scale_test compute (L (initsegm 20000)) 2 1 10;;
 
-Printf.printf "*** Computations on integer lists (chunksize=100)\n";
+Printf.printf "*** Computations on integer lists (chunksize=100)\n%!";
 
 scale_test ~chunksize:100 ~inorder:false compute (L (initsegm 20000)) 2 1 10;;
 
-Printf.printf "*** Computations on integer arrays\n";
+Printf.printf "*** Computations on integer arrays\n%!";
 
 scale_test compute (A (Array.init 20000 (fun n -> n+1))) 2 1 10;;
 
-Printf.printf "*** Computations on integer arrays (chunksize-100)\n";
+Printf.printf "*** Computations on integer arrays (chunksize-100)\n%!";
 
 scale_test ~chunksize:100 ~inorder:false compute (A (Array.init 20000 (fun n -> n+1))) 2 1 10;;
 
-Printf.printf "*** Computations on lists of floats\n";
+Printf.printf "*** Computations on lists of floats\n%!";
 
 scale_test fcompute (L (List.map float_of_int (initsegm 20000))) 2 1 10;;
 
-Printf.printf "*** Computations on lists of floats (chunksize=100)\n";
+Printf.printf "*** Computations on lists of floats (chunksize=100)\n%!";
 
 scale_test  ~chunksize:100 ~inorder:false fcompute (L (List.map float_of_int (initsegm 20000))) 2 1 10;;
 
-Printf.printf "*** Computations on arrays of floats\n";
+Printf.printf "*** Computations on arrays of floats\n%!";
 
 scale_test fcompute (A (Array.init 20000 (fun n -> float_of_int (n+1)))) 2 1 10;;
 
-Printf.printf "*** Computations on arrays of floats (chunksize=100)\n";
+Printf.printf "*** Computations on arrays of floats (chunksize=100)\n%!";
 
 scale_test  ~chunksize:100 ~inorder:false fcompute (A (Array.init 20000 (fun n -> float_of_int (n+1)))) 2 1 10;;
 

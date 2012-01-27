@@ -14,13 +14,13 @@
 (* OS related constants *)
 
 (* a reasonable size for mmapping a file containing even huge result data *)
-let huge_size = if Sys.word_size = 64 then 1 lsl 32 else 1 lsl 26;;
+let huge_size = if Sys.word_size = 64 then 1 lsl 32 else 1 lsl 26
 
 (* sequence type, subsuming lists and arrays *)
 
-type 'a sequence = L of 'a list | A of 'a array;;
+type 'a sequence = L of 'a list | A of 'a array
 
-let debug_enabled = ref false;;
+let debug_enabled = ref false
 
 let log_dir = ref (Printf.sprintf "/tmp/.parmap.%d" (Unix.getpid ()))
 
@@ -65,7 +65,7 @@ let ext_intv startv endv =
   let s,e = (min startv endv),(max startv endv) in
   let rec aux acc = function n -> if n=s then n::acc else aux (n::acc) (n-1)
   in aux [] e
-;;
+
 
 (* freopen emulation, from Xavier's suggestion on OCaml mailing list *)
 
@@ -161,15 +161,14 @@ let simplemapper ncores compute opid al collect =
   done;
   (* collect all results *)
   collect !res
-;;
 
 
 (* a more sophisticated mapper function, with automatic load balancing *)
 
 (* the type of messages exchanged between master and workers *)
 
-type msg_to_master = Ready of int | Error of int * string;;
-type msg_to_worker = Finished | Task of int;;
+type msg_to_master = Ready of int | Error of int * string
+type msg_to_worker = Finished | Task of int
 
 
 let setup_children_chans oc pipedown fdarr i = 
@@ -192,7 +191,6 @@ let setup_children_chans oc pipedown fdarr i =
      try close_in ic; close_out oc with _ -> ()
     ); exit 0 in 
   receive, signal, return, finish, pid
-;;
 
 (* parametric mapper primitive that captures the parallel structure *)
 
@@ -290,7 +288,6 @@ let mapper ncores ~chunksize compute opid al collect =
       done;
       (* collect all results *)
       collect !res
-;;
 
 (* the parallel mapfold function *)
 
@@ -306,8 +303,7 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
       with e -> exc_handler e j
     done; !r
   in
-  mapper ncores ~chunksize compute opid al  (fun r -> List.fold_right concat r opid)
-;;
+  mapper ncores ~chunksize compute opid al  (fun r -> fold_right concat r opid)
 
 (* the parallel map function *)
 
@@ -324,14 +320,11 @@ let parmap ?(ncores=1) ?chunksize (f:'a -> 'b) (s:'a sequence) : 'b list=
     in aux previous (hi-lo)
   in
   mapper ncores ~chunksize compute [] al  (fun r -> concat r)
-;;
 
 (* the parallel fold function *)
 
 let parfold ?(ncores=1) ?chunksize (op:'a -> 'b -> 'b) (s:'a sequence) (opid:'b) (concat:'b->'b->'b) : 'b=
     parmapfold ~ncores ?chunksize (fun x -> x) s op opid concat
-;;
-
 
 (* the parallel map function, on arrays *)
 
@@ -352,7 +345,6 @@ let array_parmap ?(ncores=1) ?chunksize (f:'a -> 'b) (al:'a array) : 'b array=
     with e -> exc_handler e lo
   in
   mapper ncores ~chunksize compute [||] al  (fun r -> Array.concat r)
-;;
 
 
 (* This code is highly optimised for operations on float arrays:
@@ -391,7 +383,6 @@ let init_shared_buffer a =
      http://pubs.opengroup.org/onlinepubs/009695399/functions/mmap.html
    *)
   Unix.close fd; (arr,size)
-;;
 
 let array_float_parmap ?(ncores=1) ?chunksize ?result ?sharedbuffer (f:'a -> float) (al:'a array) : float array =
   let size = Array.length al in
@@ -425,5 +416,3 @@ let array_float_parmap ?(ncores=1) ?chunksize ?result ?sharedbuffer (f:'a -> flo
         else
 	  Bytearray.to_this_floatarray a barr_out size
   in res
-;;  
-

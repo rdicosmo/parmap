@@ -13,14 +13,14 @@
 open Parmap
 
 let scale_test ?(inorder=true) ?(step=1) ?chunksize compute sequence iter nprocmin nprocmax =
-  Printf.eprintf "Testing scalability with %d iterations on %d to %d cores, step %d\n" iter nprocmin nprocmax step;
+  Printf.eprintf "Testing scalability with %d iterations on %d to %d cores, step %d\n%!" iter nprocmin nprocmax step;
   let rseq,tseq =  
     let d=Unix.gettimeofday() in
     match sequence with
       L l -> let l'=List.map compute l in l',(Unix.gettimeofday() -. d)
     | A a -> let l'=Array.to_list(Array.map compute a) in l',(Unix.gettimeofday() -. d)
   in
-  Printf.eprintf "Sequential execution takes %f seconds\n" tseq;
+  Printf.eprintf "Sequential execution takes %f seconds\n%!" tseq;
   for incr = 0 to (nprocmax-nprocmin)/step do
     let i = nprocmin + incr in
     let tot=ref 0.0 in
@@ -31,10 +31,10 @@ let scale_test ?(inorder=true) ?(step=1) ?chunksize compute sequence iter nprocm
       if rseq<>rpar then 
 	begin
 	  if (List.sort compare rseq) <> (List.sort compare rpar) then 
-	    Printf.eprintf "Parmap failure: result mismatch!\n"
+	    Printf.eprintf "Parmap failure: result mismatch!\n%!"
 	  else
-	    if inorder then Printf.eprintf "Parmap failure: result order was expected to be preserved, and is not.\n"
-	    else Printf.eprintf "Parmap warning: result order is not preserved (it was not expected to be).\n"
+	    if inorder then Printf.eprintf "Parmap failure: result order was expected to be preserved, and is not.\n%!"
+	    else Printf.eprintf "Parmap warning: result order is not preserved (it was not expected to be).\n%!"
 	end
     done;
     let speedup=tseq /. (!tot /. (float iter)) in 
