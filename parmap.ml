@@ -22,7 +22,19 @@ type 'a sequence = L of 'a list | A of 'a array
 
 let debug_enabled = ref false
 
+(* try create the common directory used for stdin/stdout redirection *)
+
 let log_dir = ref (Printf.sprintf "/tmp/.parmap.%d" (Unix.getpid ()))
+
+let can_redirect = 
+  if not(Sys.file_exists !log_dir) then 
+    try 
+      Unix.mkdir !log_dir 0o777; true
+    with Unix.Unix_error(e,s,s') -> 
+      (Printf.eprintf "[Pid %d]: Error creating %s : %s; proceeding without stdout/stderr redirection\n%!" 
+	  (Unix.getpid ()) !log_dir (Unix.error_message e));
+      false
+  else true
 
 let debug fmt =
   Printf.kprintf (
@@ -70,13 +82,16 @@ let ext_intv startv endv =
 (* freopen emulation, from Xavier's suggestion on OCaml mailing list *)
 
 let reopen_out outchan fname =
-  flush outchan;
-  if not(Sys.file_exists !log_dir) then Unix.mkdir !log_dir 0o777 ;
-  let filename = Filename.concat !log_dir fname in
-  let fd1 = Unix.descr_of_out_channel outchan in
-  let fd2 = Unix.openfile filename [Unix.O_WRONLY; Unix.O_CREAT; Unix.O_TRUNC] 0o666 in
-  Unix.dup2 fd2 fd1;
-  Unix.close fd2
+  if can_redirect then
+    begin
+      flush outchan;
+      let filename = Filename.concat !log_dir fname in
+      let fd1 = Unix.descr_of_out_channel outchan in
+      let fd2 = Unix.openfile filename [Unix.O_WRONLY; Unix.O_CREAT; Unix.O_TRUNC] 0o666 in
+      Unix.dup2 fd2 fd1;
+      Unix.close fd2
+    end
+  else ()
 
 (* unmarshal from a mmap seen as a bigarray *)
 let unmarshal fd =
