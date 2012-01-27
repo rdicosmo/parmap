@@ -31,7 +31,12 @@ let fcompute p =
   !r
 ;;
 
-Printf.printf "*** Computations on integer lists\n";
+
+Printf.printf "*** Checking the code for non tail recursive calls: an exception here indicates there are some left\n%!";
+
+scale_test (fun x -> x) (L (initsegm 10000000)) 1 2 2;;
+
+Printf.printf "*** Computations on integer lists\n%!";
 
 scale_test compute (L (initsegm 20000)) 2 1 10;;
 

@@ -48,9 +48,18 @@ let info fmt =
 
 (* utils *)
 
+(* tail recursive version of List.append *)
+
+let append_tr l1 l2 =
+  let rec aux acc = function 
+      [] -> acc
+    | a::r -> aux (a::acc) r
+  in aux l2 (List.rev l1)
+
 (* tail recursive version of List.concat *)
 
-let concat (l: 'a list) = List.fold_left (fun acc l -> l@acc) [] (List.rev l)
+let concat_tr (l: 'a list) = 
+  List.fold_left (fun acc l -> append_tr l acc) [] (List.rev l)
 
 (* tail recursive version of List.fold_right from ExtLib *)
 
@@ -334,7 +343,7 @@ let parmap ?(ncores=1) ?chunksize (f:'a -> 'b) (s:'a sequence) : 'b list=
 	| n ->  aux ((f' n)::acc) (n-1)
     in aux previous (hi-lo)
   in
-  mapper ncores ~chunksize compute [] al  (fun r -> concat r)
+  mapper ncores ~chunksize compute [] al  (fun r -> concat_tr r)
 
 (* the parallel fold function *)
 

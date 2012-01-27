@@ -17,7 +17,7 @@ let scale_test ?(inorder=true) ?(step=1) ?chunksize compute sequence iter nprocm
   let rseq,tseq =  
     let d=Unix.gettimeofday() in
     match sequence with
-      L l -> let l'=List.map compute l in l',(Unix.gettimeofday() -. d)
+      L l -> let l'=List.rev_map compute l in List.rev l',(Unix.gettimeofday() -. d)
     | A a -> let l'=Array.to_list(Array.map compute a) in l',(Unix.gettimeofday() -. d)
   in
   Printf.eprintf "Sequential execution takes %f seconds\n%!" tseq;
