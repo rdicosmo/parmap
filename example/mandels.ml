@@ -10,10 +10,24 @@
 (*  License, or (at your option) any later version.                       *)
 (**************************************************************************)
 
+(* for the toplevel
+
+#use "topfind";;
+#require "graphics";;
+#require "parmap";;
+
+*)
+
 open Graphics;;
 
 let n   = 1000;; (* the size of the square screen windows in pixels      *)
 let res = 1000;; (* the resolution: maximum number of iterations allowed *)
+
+(* scale factor and offset of the picture *)
+
+let scale = ref 1.;;
+let ofx = ref 0.;;
+let ofy = ref 0.;;
 
 (* convert an integer in the range 0..res into a screen color *)
 
@@ -34,8 +48,8 @@ let pixel (j,k,res,n) =
   let colour = Array.create n (Graphics.black) in
 
   for s = 0 to (n-1) do
-    let j1 = ref (float  j.(s)) in
-    let k1 = ref (float  k) in
+    let j1 = ref (((float  j.(s)) +. !ofx) /. !scale) in
+    let k1 = ref (((float  k) +. !ofy) /. !scale) in
     begin
       zr := !j1 *. !d -. 1.0;
       zi := !k1 *. !d -. 1.0;
@@ -83,18 +97,65 @@ let tasks =
   List.map (fun seed -> (iniv,seed,res,n)) (initsegm n)
 ;;
 
-let draw res =
-  open_graph (" "^(string_of_int n)^"x"^(string_of_int n));
-  List.iter show_a_result res;;
+let draw res = List.iter show_a_result res;;
 
-(* compute the image *)
 
-Printf.printf "*** Computing\n%!";;
-let m=Parmap.parmap ~ncores:4 ~chunksize: 1 pixel (Parmap.L tasks);;
+Graphics.set_window_title "Mandelbrot";;
+Graphics.open_graph (" "^(string_of_int n)^"x"^(string_of_int n));;
 
-(* draw the image *)
+(* compute and draw *)
 
-Printf.printf "*** Drawing... hit newline to finish\n%!";;
-draw m;;
-ignore(input_line stdin);;
-close_graph();;
+let redraw () = Printf.eprintf "Computing...%!";draw(Parmap.parmap ~ncores:4 ~chunksize: 1 pixel (Parmap.L tasks)); Printf.eprintf "done.\n%!";;
+
+(* event loop for zooming into the picture *)
+
+let rezoom x y w =
+   let deltas = ((float n)/.(float w)) in
+   ofx := (!ofx +. (float x)) *. deltas;
+   ofy := (!ofy +. (float y)) *. deltas;
+   scale := !scale *. deltas;
+   redraw();;
+let reset () = scale:=1.; ofx:=0.; ofy:=0.;redraw();;
+let zoom_in () = rezoom (n/4) (n/4) (n/2);;
+let zoom_out () = rezoom (-n/4) (-n/4) (n*2);;
+
+(* encode state machine here *)
+
+let rec init () =
+  let s = wait_next_event [Button_down; Key_pressed] in
+  if s.button then 
+    track_rect s.mouse_x s.mouse_y None
+  else if s.keypressed then
+    match s.key with
+      '+' -> let _ = zoom_in() in init ()
+    | '-' -> let _ = zoom_out() in init ()
+    | 'c' -> let _ = reset() in init ()
+    | 'q' -> close_graph()
+
+and track_rect x y oldimg =
+  let s = wait_next_event [Button_up; Mouse_motion] in
+  let x'=s.mouse_x and y'=s.mouse_y in
+  let bx,by,w,h = (min x x'), (min y y'), (abs (x'-x)), (abs (y'-y)) in
+  if s.button then
+    begin
+      (* restore image if we are in the loop *)
+      (match oldimg with 
+	None -> ()
+      | Some (i,x,y) -> draw_image i x y);
+      if w>0 & h>0 then 
+	let i = get_image bx by w h in
+	(* draw the border _inside_ the area *)
+	draw_rect bx by (w-1) (h-1);
+	track_rect x y (Some(i,bx,by))
+      else
+	track_rect x y oldimg
+    end
+  else
+    (rezoom bx by (min w h); init())
+;;
+
+(* run the event loop *)
+
+redraw();;
+init()
+
