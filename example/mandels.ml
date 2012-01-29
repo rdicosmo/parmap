@@ -20,8 +20,8 @@
 
 open Graphics;;
 
-let n   = 1000;; (* the size of the square screen windows in pixels      *)
-let res = 1000;; (* the resolution: maximum number of iterations allowed *)
+let n   = ref 1000;; (* the size of the square screen windows in pixels      *)
+let res = ref 1000;; (* the resolution: maximum number of iterations allowed *)
 
 (* scale factor and offset of the picture *)
 
@@ -37,7 +37,7 @@ let color_of c res = Pervasives.truncate
 (* compute the color of a pixel by iterating z_n+1=z_n^2+c *)
 (* j,k are the pixel coordinates                           *)
 
-let pixel (j,k,res,n) = 
+let pixel (j,k,n) = 
   let zr = ref 0.0 in
   let zi = ref 0.0 in
   let cr = ref 0.0 in
@@ -57,7 +57,7 @@ let pixel (j,k,res,n) =
       ci := !zi;
       zrs := 0.0;
       zis := 0.0;
-      for i=0 to (res-1) do
+      for i=0 to (!res-1) do
 	begin
 	  if(not((!zrs +. !zis) > 4.0))
 	  then 
@@ -66,7 +66,7 @@ let pixel (j,k,res,n) =
 	      zis := !zi *. !zi;
 	      zi  := 2.0 *. !zr *. !zi +. !ci;
 	      zr  := !zrs -. !zis +. !cr;
-	      Array.set colour s (color_of i res);
+	      Array.set colour s (color_of i !res);
 	    end;
     	end
       done
@@ -89,39 +89,93 @@ let initsegm n =
 ;;
 
 let tasks = 
-  let ini = Array.create n 0 in
+  let ini = Array.create !n 0 in
   let iniv = 
-    for i=0 to (n-1) do
+    for i=0 to (!n-1) do
       Array.set ini i i
     done; ini in
-  List.map (fun seed -> (iniv,seed,res,n)) (initsegm n)
+  List.map (fun seed -> (iniv,seed,!n)) (initsegm !n)
 ;;
 
 let draw res = List.iter show_a_result res;;
 
 
-Graphics.set_window_title "Mandelbrot";;
-Graphics.open_graph (" "^(string_of_int n)^"x"^(string_of_int n));;
+(*** fork compute back-end *)
+
+type signal = 
+    Compute of int*float*float*float*int*int 
+              (* resolution, ofx, ofy, scale, ncores, chunksize *)
+  | Exit (* finished computation *)
+;;
+
+let cmdpipe_rd,cmdpipe_wr=Unix.pipe ();;
+let respipe_rd,respipe_wr=Unix.pipe ();;
+
+match Unix.fork() with  
+  0 -> 
+    begin (* compute back-end *)
+      Unix.close cmdpipe_wr;
+      Unix.close respipe_rd;
+      let ic = Unix.in_channel_of_descr cmdpipe_rd in
+      let oc = Unix.out_channel_of_descr respipe_wr in
+      while true do 
+	let msg = try Marshal.from_channel ic with _ -> exit 0 in 
+	match msg with
+	  Compute (res',ofx',ofy',scale',nc',cs') -> 
+	    Printf.eprintf "Got task...\n%!";
+	    res:=res';ofx:=ofx';ofy:=ofy';scale:=scale';
+	    let m = Parmap.parmap ~ncores:nc' ~chunksize: cs' pixel (Parmap.L tasks)
+	    in (Marshal.to_channel oc m []; flush oc)
+	| Exit -> exit 0
+      done
+    end
+| -1 ->  Printf.eprintf "fork error: pid %d" (Unix.getpid()); 
+| pid -> ()
+;;
+
+(*** the main continues here *)
+
+Unix.close cmdpipe_rd;;
+Unix.close respipe_wr;;
+let out,read = 
+  let ic = Unix.in_channel_of_descr respipe_rd in 
+  let oc = Unix.out_channel_of_descr cmdpipe_wr in
+  (fun m -> Marshal.to_channel oc m []; flush oc),
+  (fun () -> Marshal.from_channel ic)
+;;
 
 (* compute and draw *)
 
-let redraw () = Printf.eprintf "Computing...%!";draw(Parmap.parmap ~ncores:4 ~chunksize: 1 pixel (Parmap.L tasks)); Printf.eprintf "done.\n%!";;
+let compute () = 
+  let _ = out (Compute (!res,!ofx,!ofy,!scale,4,1)) in
+  read();;
+
+let redraw () = Printf.eprintf "Computing...%!";draw(compute()); Printf.eprintf "done.\n%!";;
 
 (* event loop for zooming into the picture *)
 
 let rezoom x y w =
-   let deltas = ((float n)/.(float w)) in
+   let deltas = ((float !n)/.(float w)) in
    ofx := (!ofx +. (float x)) *. deltas;
    ofy := (!ofy +. (float y)) *. deltas;
    scale := !scale *. deltas;
    redraw();;
 let reset () = scale:=1.; ofx:=0.; ofy:=0.;redraw();;
-let zoom_in () = rezoom (n/4) (n/4) (n/2);;
-let zoom_out () = rezoom (-n/4) (-n/4) (n*2);;
+let refine () = res:=!res*2; redraw ();;
+let unrefine () = res:=!res/2; redraw ();;
+let zoom_in () = rezoom (!n/4) (!n/4) (!n/2);;
+let zoom_out () = rezoom (-(!n/2)) (-(!n/2)) (!n*2);;
+let dumpnum = ref 0;;
+let dump () = 
+  Printf.eprintf "Dumping image taken at ofx: %f ofy: %f scale: %f\n%!" !ofx !ofy !scale;
+  let img = Graphics.dump_image (Graphics.get_image 0 0 !n !n) in
+  let oc = open_out (Printf.sprintf "mandels.image.dump.%04d" !dumpnum) in
+  Marshal.to_channel oc img []; dumpnum:=!dumpnum+1; close_out oc;;
 
 (* encode state machine here *)
 
 let rec init () =
+  Printf.eprintf "Init...\n%!";	
   let s = wait_next_event [Button_down; Key_pressed] in
   if s.button then 
     track_rect s.mouse_x s.mouse_y None
@@ -129,10 +183,15 @@ let rec init () =
     match s.key with
       '+' -> let _ = zoom_in() in init ()
     | '-' -> let _ = zoom_out() in init ()
+    | 'r' -> let _ = refine () in init ()
+    | 'u' -> let _ = unrefine () in init ()
     | 'c' -> let _ = reset() in init ()
+    | 'd' -> let _ = dump() in init ()
     | 'q' -> close_graph()
+    | _ -> init ()
 
 and track_rect x y oldimg =
+  Printf.eprintf "Rect...\n%!";	
   let s = wait_next_event [Button_up; Mouse_motion] in
   let x'=s.mouse_x and y'=s.mouse_y in
   let bx,by,w,h = (min x x'), (min y y'), (abs (x'-x)), (abs (y'-y)) in
@@ -154,7 +213,10 @@ and track_rect x y oldimg =
     (rezoom bx by (min w h); init())
 ;;
 
-(* run the event loop *)
+(*** Open the main graphics window and run the event loop *)
+
+Graphics.set_window_title "Mandelbrot";;
+Graphics.open_graph (" "^(string_of_int !n)^"x"^(string_of_int !n));;
 
 redraw();;
 init()
