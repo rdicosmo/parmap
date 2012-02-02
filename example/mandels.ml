@@ -150,7 +150,10 @@ let compute () =
   let _ = out (Compute (!res,!ofx,!ofy,!scale,4,1)) in
   read();;
 
-let redraw () = Printf.eprintf "Computing...%!";draw(compute()); Printf.eprintf "done.\n%!";;
+let redraw () = 
+  Printf.eprintf "Computing...%!";
+  draw(compute()); 
+  Printf.eprintf "done.\n%!";;
 
 (* event loop for zooming into the picture *)
 
