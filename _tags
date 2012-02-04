@@ -5,3 +5,4 @@
 <*.{ml,mli}>: package(unix), package(bigarray)
 
 
+<*sdl.*>: package(bigarray), package(sdl)
