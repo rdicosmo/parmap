@@ -78,6 +78,18 @@ val parmap : ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a sequence -> 'b li
       load balancing for unbalanced computations, but the order
       of the result is no longer guaranteed to be preserved. *)
 
+(** {6 Parallel iteration} *)
+
+val pariter : ?ncores:int -> ?chunksize:int -> ('a -> unit) -> 'a sequence -> unit
+  (** [pariter  ~ncores:n f (L l) ] computes [List.iter f l] 
+      by forking [n] processes on a multicore machine.
+      [parmap  ~ncores:n f (A a) ] computes [Array.iter f a] 
+      by forking [n] processes on a multicore machine.
+      If the optional [chunksize] parameter is specified,
+      the processes perform the computation in an on-demand fashion
+      on blocks of size [chunksize]; this provides automatic
+      load balancing for unbalanced computations. *)
+
 
 (** {6 Parallel map on arrays} *)
 

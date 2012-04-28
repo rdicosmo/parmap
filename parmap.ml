@@ -186,6 +186,41 @@ let simplemapper ncores compute opid al collect =
   (* collect all results *)
   collect !res
 
+(* a simple iteration function that iterates on 1/nth of the data on each of the n cores *)
+
+let simpleiter ncores compute al =
+  (* flush everything *)
+  flush_all();
+  (* init task parameters *)
+  let ln = Array.length al in
+  let chunksize = ln/ncores in
+  (* call the GC before forking *)
+  Gc.compact ();
+  (* spawn children *)
+  for i = 0 to ncores-1 do
+    match Unix.fork() with
+      0 -> 
+	begin
+          let lo=i*chunksize in
+          let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
+          let exc_handler e j = (* handle an exception at index j *)
+	    info "error at index j=%d in (%d,%d), chunksize=%d of a total of %d got exception %s on core %d \n%!"
+	      j lo hi chunksize (hi-lo+1) (Printexc.to_string e) i;
+	    exit 1
+          in		    
+	  compute al lo hi exc_handler;
+          exit 0
+	end
+    | -1 -> info "fork error: pid %d; i=%d" (Unix.getpid()) i; 
+    | pid -> ()
+  done;
+  (* wait for all children *)
+  for i = 0 to ncores-1 do 
+    try ignore(Unix.wait()) 
+    with Unix.Unix_error (Unix.ECHILD, _, _) -> ()
+  done
+  (* return with no value *)
+
 
 (* a more sophisticated mapper function, with automatic load balancing *)
 
@@ -195,7 +230,7 @@ type msg_to_master = Ready of int | Error of int * string
 type msg_to_worker = Finished | Task of int
 
 
-let setup_children_chans oc pipedown fdarr i = 
+let setup_children_chans oc pipedown ?fdarr i = 
   Setcore.setcore i;
   (* send stdout and stderr to a file to avoid mixing output from different cores *)
   reopen_out stdout (Printf.sprintf "stdout.%d" i);
@@ -208,7 +243,7 @@ let setup_children_chans oc pipedown fdarr i =
   let signal v = Marshal.to_channel oc v []; flush oc in
   let return v = 
     let d = Unix.gettimeofday() in 
-    let _ = marshal fdarr.(i) v in
+    let _ = match fdarr with Some fdarr -> marshal fdarr.(i) v | None -> () in
     debug "worker elapsed %f in marshalling" (Unix.gettimeofday() -. d) in
   let finish () =
     (debug "shutting down (pid=%d)\n%!" pid;
@@ -244,7 +279,7 @@ let mapper ncores ~chunksize compute opid al collect =
               let d=Unix.gettimeofday()  in
               (* primitives for communication *)
               Unix.close pipeup_rd;
-              let receive,signal,return,finish,pid = setup_children_chans oc_up pipedown fdarr i in
+              let receive,signal,return,finish,pid = setup_children_chans oc_up pipedown ~fdarr i in
               let reschunk=ref opid in
               let computetask n = (* compute chunk number n *)
 		let lo=n*chunksize in
@@ -312,6 +347,93 @@ let mapper ncores ~chunksize compute opid al collect =
       done;
       (* collect all results *)
       collect !res
+
+(* parametric iteration primitive that captures the parallel structure *)
+
+let geniter ncores ~chunksize compute al =
+  let ln = Array.length al in
+  match chunksize with 
+    None -> simpleiter ncores compute al (* no need of load balancing *)
+  | Some v when ncores=ln/v -> simpleiter ncores compute al (* no need of load balancing *)
+  | Some v -> 
+      (* init task parameters *)
+      let chunksize = v and ntasks = ln/v in
+      (* flush everything *)
+      flush_all ();
+      (* setup communication channel with the workers *)
+      let pipedown=Array.init ncores (fun _ -> Unix.pipe ()) in
+      let pipeup_rd,pipeup_wr=Unix.pipe () in
+      let oc_up = Unix.out_channel_of_descr pipeup_wr in
+      (* call the GC before forking *)
+      Gc.compact ();
+      (* spawn children *)
+      for i = 0 to ncores-1 do
+	match Unix.fork() with
+	  0 -> 
+	    begin    
+              let d=Unix.gettimeofday()  in
+              (* primitives for communication *)
+              Unix.close pipeup_rd;
+              let receive,signal,return,finish,pid = setup_children_chans oc_up pipedown i in
+              let computetask n = (* compute chunk number n *)
+		let lo=n*chunksize in
+		let hi=if n=ntasks-1 then ln-1 else (n+1)*chunksize-1 in
+		let exc_handler e j = (* handle an exception at index j *)
+		  begin
+		    let errmsg = Printexc.to_string e
+		    in info "error at index j=%d in (%d,%d), chunksize=%d of a total of %d got exception %s on core %d \n%!"
+		      j lo hi chunksize (hi-lo+1) errmsg i;
+		    signal (Error (i,errmsg)); finish()
+		  end
+		in		    
+		compute al lo hi exc_handler;
+		info "worker on core %d (pid=%d), segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
+		  i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
+	      in
+	      while true do
+		(* ask for work until we are finished *)
+		signal (Ready i);
+		match receive() with
+		| Finished -> return(); finish ()
+		| Task n -> computetask n
+	      done;
+	    end
+	| -1 ->  info "fork error: pid %d; i=%d" (Unix.getpid()) i; 
+	| pid -> ()
+      done;
+
+      (* close unused ends of the pipes *)
+      Array.iter (fun (rfd,_) -> Unix.close rfd) pipedown;
+      Unix.close pipeup_wr;
+
+      (* get ic/oc/wfdl *)
+      let ocs=Array.init ncores (fun n -> Unix.out_channel_of_descr (snd pipedown.(n))) in
+      let ic=Unix.in_channel_of_descr pipeup_rd in
+
+      (* feed workers until all tasks are finished *)
+      for i=0 to ntasks-1 do
+	match Marshal.from_channel ic with
+	  Ready w -> 
+	    (debug "sending task %d to worker %d" i w;
+	     let oc = ocs.(w) in
+	     (Marshal.to_channel oc (Task i) []); flush oc)
+	| Error (core,msg) -> (info "aborting due to exception on core %d: %s" core msg; exit 1)
+      done;
+
+      (* send termination token to all children *)
+      Array.iter (fun oc -> 
+	Marshal.to_channel oc Finished []; 
+        flush oc; 
+        close_out oc
+      ) ocs;
+
+      (* wait for all children to terminate *)
+      for i = 0 to ncores-1 do 
+	try ignore(Unix.wait()) 
+	with Unix.Unix_error (Unix.ECHILD, _, _) -> ()
+      done
+      (* no data to return *)
+
 
 (* the parallel mapfold function *)
 
@@ -440,3 +562,20 @@ let array_float_parmap ?(ncores=1) ?chunksize ?result ?sharedbuffer (f:'a -> flo
         else
 	  Bytearray.to_this_floatarray a barr_out size
   in res
+
+
+(* the parallel iteration function *)
+
+let pariter ?(ncores=1) ?chunksize (f:'a -> unit) (s:'a sequence) : unit=
+  (* enforce array to speed up access to the list elements *)
+  let al = match s with A al -> al | L l  -> Array.of_list l in
+  let compute al lo hi exc_handler =
+    (* iterate on the given segment *)
+    let f' j = try f (Array.unsafe_get al (lo+j)) with e -> exc_handler e j in
+    for i = 0 to hi-lo do
+      f' i
+    done
+  in
+  geniter ncores ~chunksize compute al
+
+
