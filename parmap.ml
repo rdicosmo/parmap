@@ -437,7 +437,7 @@ let geniter ncores ~chunksize compute al =
 
 (* the parallel mapfold function *)
 
-let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c->'c) (opid:'c) (concat:'c->'c->'c) : 'c=
+let parmapifold ?(ncores=1) ?(chunksize) (f:int -> 'a -> 'b) (s:'a sequence) (op:'b->'c->'c) (opid:'c) (concat:'c->'c->'c) : 'c=
   (* enforce array to speed up access to the list elements *)
   let al = match s with A al -> al | L l  -> Array.of_list l in
   let compute al lo hi previous exc_handler =
@@ -445,20 +445,24 @@ let parmapfold ?(ncores=1) ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c-
     let r = ref previous in
     for j=0 to (hi-lo) do
       try 
-	r := op (f (Array.unsafe_get al (hi-j))) !r;
+        let idx = hi-j in
+	r := op (f idx (Array.unsafe_get al idx)) !r;
       with e -> exc_handler e j
     done; !r
   in
   mapper ncores ~chunksize compute opid al  (fun r -> fold_right concat r opid)
 
+let parmapfold ?ncores ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c->'c) (opid:'c) (concat:'c->'c->'c) : 'c=
+  parmapifold ?ncores ?chunksize (fun _ x -> f x) s op opid concat
+
 (* the parallel map function *)
 
-let parmap ?(ncores=1) ?chunksize (f:'a -> 'b) (s:'a sequence) : 'b list=
+let parmapi ?(ncores=1) ?chunksize (f:int ->'a -> 'b) (s:'a sequence) : 'b list=
   (* enforce array to speed up access to the list elements *)
   let al = match s with A al -> al | L l  -> Array.of_list l in
   let compute al lo hi previous exc_handler =
     (* iterate in reverse order, to accumulate in the right order, and add to acc *)
-    let f' j = try f (Array.unsafe_get al (lo+j)) with e -> exc_handler e j in
+    let f' j = try let idx = lo+j in f idx (Array.unsafe_get al idx) with e -> exc_handler e j in
     let rec aux acc = 
       function
 	  0 ->  (f' 0)::acc
@@ -466,6 +470,9 @@ let parmap ?(ncores=1) ?chunksize (f:'a -> 'b) (s:'a sequence) : 'b list=
     in aux previous (hi-lo)
   in
   mapper ncores ~chunksize compute [] al  (fun r -> concat_tr r)
+
+let parmap ?ncores ?chunksize (f:'a -> 'b) (s:'a sequence) : 'b list=
+    parmapi ?ncores ?chunksize (fun _ x -> f x) s
 
 (* the parallel fold function *)
 
@@ -566,16 +573,17 @@ let array_float_parmap ?(ncores=1) ?chunksize ?result ?sharedbuffer (f:'a -> flo
 
 (* the parallel iteration function *)
 
-let pariter ?(ncores=1) ?chunksize (f:'a -> unit) (s:'a sequence) : unit=
+let pariteri ?(ncores=1) ?chunksize (f:int -> 'a -> unit) (s:'a sequence) : unit=
   (* enforce array to speed up access to the list elements *)
   let al = match s with A al -> al | L l  -> Array.of_list l in
   let compute al lo hi exc_handler =
     (* iterate on the given segment *)
-    let f' j = try f (Array.unsafe_get al (lo+j)) with e -> exc_handler e j in
+    let f' j = try let idx = lo+j in f idx (Array.unsafe_get al idx) with e -> exc_handler e j in
     for i = 0 to hi-lo do
       f' i
     done
   in
   geniter ncores ~chunksize compute al
 
-
+let pariter ?ncores ?chunksize (f:'a -> unit) (s:'a sequence) : unit=
+  pariteri ?ncores ?chunksize (fun _ x -> f x) s

@@ -37,7 +37,6 @@ type 'a sequence = L of 'a list | A of 'a array;;
 (** {6 Parallel mapfold} *)
 
 val parmapfold : ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a sequence -> ('b-> 'c -> 'c) -> 'c -> ('c->'c->'c) -> 'c
-
   (** [parmapfold ~ncores:n f (L l) op b concat ] computes [List.fold_right op (List.map f l) b] 
       by forking [n] processes on a multicore machine. 
       You need to provide the extra [concat] operator to combine the partial results of the
@@ -90,6 +89,23 @@ val pariter : ?ncores:int -> ?chunksize:int -> ('a -> unit) -> 'a sequence -> un
       on blocks of size [chunksize]; this provides automatic
       load balancing for unbalanced computations. *)
 
+(** {6 Parallel mapfold, indexed} *)
+
+val parmapifold : ?ncores:int -> ?chunksize:int -> (int -> 'a -> 'b) -> 'a sequence -> ('b-> 'c -> 'c) -> 'c -> ('c->'c->'c) -> 'c
+  (** Like parmapfold, but the map function gets as an extra argument
+      the index of the mapped element *)
+
+(** {6 Parallel map} *)
+
+val parmapi : ?ncores:int -> ?chunksize:int -> (int -> 'a -> 'b) -> 'a sequence -> 'b list
+  (** Like parmap, but the map function gets as an extra argument
+      the index of the mapped element *)
+
+(** {6 Parallel iteration, indexed} *)
+
+val pariteri : ?ncores:int -> ?chunksize:int -> (int -> 'a -> unit) -> 'a sequence -> unit
+  (** Like pariter, but the iterated function gets as an extra argument
+      the index of the sequence element *)
 
 (** {6 Parallel map on arrays} *)
 
