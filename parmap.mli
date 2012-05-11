@@ -118,6 +118,10 @@ val array_parmap : ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a array -> 'b
       load balancing for unbalanced computations, but the order
       of the result is no longer guaranteed to be preserved. *)
 
+val array_parmapi : ?ncores:int -> ?chunksize:int -> (int -> 'a -> 'b) -> 'a array -> 'b array
+  (** Like array_parmap, but the map function gets as an extra argument
+      the index of the mapped element *)
+
 (** {6 Parallel map on float arrays } *)
 
 exception WrongArraySize
@@ -149,3 +153,9 @@ val array_float_parmap : ?ncores:int -> ?chunksize:int -> ?result: float array -
       passing the result as the optional [sharedbuffer] parameter to each
       subsequent call to [array_float_parmap].  Raises WrongArraySize if
       [sharedbuffer] is too small to hold the input data. *)
+
+val array_float_parmapi : ?ncores:int -> ?chunksize:int -> ?result: float array -> ?sharedbuffer: buf -> (int -> 'a -> float) -> 'a array -> float array
+
+  (** Like array_float_parmap, but the map function gets as an extra argument
+      the index of the mapped element *)
+

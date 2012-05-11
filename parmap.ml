@@ -481,24 +481,27 @@ let parfold ?(ncores=1) ?chunksize (op:'a -> 'b -> 'b) (s:'a sequence) (opid:'b)
 
 (* the parallel map function, on arrays *)
 
-let map_range lo hi f a =
+let mapi_range lo hi (f:int -> 'a -> 'b) a =
   let l = hi-lo in
   if l < 0 then [||] else begin
-    let r = Array.create (l+1) (f(Array.unsafe_get a lo)) in
+    let r = Array.create (l+1) (f 0 (Array.unsafe_get a lo)) in
     for i = 1 to l do
-      Array.unsafe_set r i (f(Array.unsafe_get a (lo+i)))
+      let idx = lo+i in
+      Array.unsafe_set r i (f idx (Array.unsafe_get a idx))
     done;
     r
   end
 
-let array_parmap ?(ncores=1) ?chunksize (f:'a -> 'b) (al:'a array) : 'b array=
+let array_parmapi ?(ncores=1) ?chunksize (f:int -> 'a -> 'b) (al:'a array) : 'b array=
   let compute a lo hi previous exc_handler =
     try 
-      Array.concat [(map_range lo hi f a);previous]
+      Array.concat [(mapi_range lo hi f a);previous]
     with e -> exc_handler e lo
   in
   mapper ncores ~chunksize compute [||] al  (fun r -> Array.concat r)
 
+let array_parmap ?ncores ?chunksize (f:'a -> 'b) (al:'a array) : 'b array=
+  array_parmapi ?ncores ?chunksize (fun _ x -> f x) al 
 
 (* This code is highly optimised for operations on float arrays:
 
@@ -537,7 +540,7 @@ let init_shared_buffer a =
    *)
   Unix.close fd; (arr,size)
 
-let array_float_parmap ?(ncores=1) ?chunksize ?result ?sharedbuffer (f:'a -> float) (al:'a array) : float array =
+let array_float_parmapi ?(ncores=1) ?chunksize ?result ?sharedbuffer (f:int -> 'a -> float) (al:'a array) : float array =
   let size = Array.length al in
   let barr_out = 
     match sharedbuffer with
@@ -555,7 +558,7 @@ let array_float_parmap ?(ncores=1) ?chunksize ?result ?sharedbuffer (f:'a -> flo
   let compute _ lo hi _ exc_handler =
     try
       for i=lo to hi do 
-	Array.unsafe_set barr_out_as_array i (f (Array.unsafe_get al i)) 
+	Array.unsafe_set barr_out_as_array i (f i (Array.unsafe_get al i)) 
       done
     with e -> exc_handler e lo
   in
@@ -570,6 +573,8 @@ let array_float_parmap ?(ncores=1) ?chunksize ?result ?sharedbuffer (f:'a -> flo
 	  Bytearray.to_this_floatarray a barr_out size
   in res
 
+let array_float_parmap ?ncores ?chunksize ?result ?sharedbuffer (f:'a -> float) (al:'a array) : float array =
+  array_float_parmapi ?ncores ?chunksize ?result ?sharedbuffer (fun _ x -> f x) al
 
 (* the parallel iteration function *)
 
