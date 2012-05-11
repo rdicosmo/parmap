@@ -82,7 +82,7 @@ let fold_right f l init =
 
 (* would be [? a | a <- startv--endv] using list comprehension from Batteries *)
 
-let ext_intv startv endv =
+let range startv endv =
   let s,e = (min startv endv),(max startv endv) in
   let rec aux acc = function n -> if n=s then n::acc else aux (n::acc) (n-1)
   in aux [] e
@@ -474,7 +474,7 @@ let parfold ?(ncores=1) ?chunksize (op:'a -> 'b -> 'b) (s:'a sequence) (opid:'b)
 
 (* the parallel map function, on arrays *)
 
-let map_intv lo hi f a =
+let map_range lo hi f a =
   let l = hi-lo in
   if l < 0 then [||] else begin
     let r = Array.create (l+1) (f(Array.unsafe_get a lo)) in
@@ -487,7 +487,7 @@ let map_intv lo hi f a =
 let array_parmap ?(ncores=1) ?chunksize (f:'a -> 'b) (al:'a array) : 'b array=
   let compute a lo hi previous exc_handler =
     try 
-      Array.concat [(map_intv lo hi f a);previous]
+      Array.concat [(map_range lo hi f a);previous]
     with e -> exc_handler e lo
   in
   mapper ncores ~chunksize compute [||] al  (fun r -> Array.concat r)
