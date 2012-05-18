@@ -8,7 +8,8 @@ LicenseFile:  LICENSE
 ConfType:     custom (0.3)
 BuildType:    custom (0.3)
 InstallType:  custom (0.3)
-BuildTools:   make
+BuildDepends: bigarray, unix
+BuildTools:   make, ocamlbuild
 Synopsis:     library to exploit multicore architectures (parallel programming)
 
 XCustomConf:      ./configure
@@ -16,5 +17,5 @@ XCustomBuild:     make
 XCustomInstall:   make install
 XCustomUninstall: make uninstall
 
-Library zip
-    Path: .
+Library parmap
+    Path: _build
