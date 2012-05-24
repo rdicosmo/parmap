@@ -37,7 +37,6 @@ type 'a sequence = L of 'a list | A of 'a array;;
 (** {6 Parallel mapfold} *)
 
 val parmapfold : ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a sequence -> ('b-> 'c -> 'c) -> 'c -> ('c->'c->'c) -> 'c
-
   (** [parmapfold ~ncores:n f (L l) op b concat ] computes [List.fold_right op (List.map f l) b] 
       by forking [n] processes on a multicore machine. 
       You need to provide the extra [concat] operator to combine the partial results of the
@@ -78,6 +77,35 @@ val parmap : ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a sequence -> 'b li
       load balancing for unbalanced computations, but the order
       of the result is no longer guaranteed to be preserved. *)
 
+(** {6 Parallel iteration} *)
+
+val pariter : ?ncores:int -> ?chunksize:int -> ('a -> unit) -> 'a sequence -> unit
+  (** [pariter  ~ncores:n f (L l) ] computes [List.iter f l] 
+      by forking [n] processes on a multicore machine.
+      [parmap  ~ncores:n f (A a) ] computes [Array.iter f a] 
+      by forking [n] processes on a multicore machine.
+      If the optional [chunksize] parameter is specified,
+      the processes perform the computation in an on-demand fashion
+      on blocks of size [chunksize]; this provides automatic
+      load balancing for unbalanced computations. *)
+
+(** {6 Parallel mapfold, indexed} *)
+
+val parmapifold : ?ncores:int -> ?chunksize:int -> (int -> 'a -> 'b) -> 'a sequence -> ('b-> 'c -> 'c) -> 'c -> ('c->'c->'c) -> 'c
+  (** Like parmapfold, but the map function gets as an extra argument
+      the index of the mapped element *)
+
+(** {6 Parallel map} *)
+
+val parmapi : ?ncores:int -> ?chunksize:int -> (int -> 'a -> 'b) -> 'a sequence -> 'b list
+  (** Like parmap, but the map function gets as an extra argument
+      the index of the mapped element *)
+
+(** {6 Parallel iteration, indexed} *)
+
+val pariteri : ?ncores:int -> ?chunksize:int -> (int -> 'a -> unit) -> 'a sequence -> unit
+  (** Like pariter, but the iterated function gets as an extra argument
+      the index of the sequence element *)
 
 (** {6 Parallel map on arrays} *)
 
@@ -89,6 +117,10 @@ val array_parmap : ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a array -> 'b
       on blochs of size [chunksize]; this provides automatic
       load balancing for unbalanced computations, but the order
       of the result is no longer guaranteed to be preserved. *)
+
+val array_parmapi : ?ncores:int -> ?chunksize:int -> (int -> 'a -> 'b) -> 'a array -> 'b array
+  (** Like array_parmap, but the map function gets as an extra argument
+      the index of the mapped element *)
 
 (** {6 Parallel map on float arrays } *)
 
@@ -121,3 +153,9 @@ val array_float_parmap : ?ncores:int -> ?chunksize:int -> ?result: float array -
       passing the result as the optional [sharedbuffer] parameter to each
       subsequent call to [array_float_parmap].  Raises WrongArraySize if
       [sharedbuffer] is too small to hold the input data. *)
+
+val array_float_parmapi : ?ncores:int -> ?chunksize:int -> ?result: float array -> ?sharedbuffer: buf -> (int -> 'a -> float) -> 'a array -> float array
+
+  (** Like array_float_parmap, but the map function gets as an extra argument
+      the index of the mapped element *)
+
