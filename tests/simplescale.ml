@@ -36,6 +36,29 @@ Printf.printf "*** Checking the code for non tail recursive calls: an exception 
 
 scale_test (fun x -> x) (L (initsegm 10000000)) 1 2 2;;
 
+
+Printf.printf "*** Checking that we properly parallelise execution if we have less tasks than cores: if you do not see 5 processes, there is a problem\n%!";
+
+debugging true;;
+
+(* scale_test (fun x -> x) (L (initsegm 5)) 1 8 8;; *)
+
+Printf.printf "*   Simplemapper 8 cores, 5 elements\n%!";
+ignore(parmap ~ncores:8 (fun x -> x) (L (initsegm 5)));;
+
+Printf.printf "*   Simpleiter 8 cores, 5 elements\n%!";
+ignore(pariter ~ncores:8 (fun x -> ()) (L (initsegm 5)));;
+
+Printf.printf "*** Checking that we properly handle bogus core numbers\n%!";
+Printf.printf "*   Simplemapper 0 cores\n%!";
+
+ignore(parmap ~ncores:0 (fun x -> x) (L (initsegm 5)));;
+
+Printf.printf "*   Simpleiter 0 cores\n%!";
+ignore(pariter ~ncores:0 (fun x -> ()) (L (initsegm 5)));;
+
+debugging false;;
+
 Printf.printf "*** Computations on integer lists\n%!";
 
 scale_test compute (L (initsegm 20000)) 2 1 10;;

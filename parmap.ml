@@ -152,7 +152,9 @@ let simplemapper ncores compute opid al collect =
   flush_all();
   (* init task parameters *)
   let ln = Array.length al in
-  let chunksize = ln/ncores in
+  let ncores = min ln (max 1 ncores) in
+  let chunksize = max 1 (ln/ncores) in
+  debug "simplemapper on %d elements, on %d cores, chunksize = %d%!" ln ncores chunksize;
   (* create descriptors to mmap *)
   let fdarr=Array.init ncores (fun _ -> tempfd()) in
   (* call the GC before forking *)
@@ -197,7 +199,9 @@ let simpleiter ncores compute al =
   flush_all();
   (* init task parameters *)
   let ln = Array.length al in
-  let chunksize = ln/ncores in
+  let ncores = min ln (max 1 ncores) in
+  let chunksize = max 1 (ln/ncores) in
+  debug "simplemapper on %d elements, on %d cores, chunksize = %d%!" ln ncores chunksize;
   (* call the GC before forking *)
   Gc.compact ();
   (* spawn children *)
@@ -259,11 +263,13 @@ let setup_children_chans oc pipedown ?fdarr i =
 
 let mapper ncores ~chunksize compute opid al collect =
   let ln = Array.length al in
+  let ncores = min ln (max 1 ncores) in
+  debug "mapper on %d elements, on %d cores%!" ln ncores;
   match chunksize with 
     None -> simplemapper ncores compute opid al collect (* no need of load balancing *)
-  | Some v when ncores=ln/v -> simplemapper ncores compute opid al collect (* no need of load balancing *)
+  | Some v when ncores >= ln/v -> simplemapper ncores compute opid al collect (* no need of load balancing if more cores than tasks *)
   | Some v -> 
-      (* init task parameters *)
+      (* init task parameters : ntasks > 0 here, as otherwise ncores >= 1 >= ln/v = ntasks and we would take the branch above *)
       let chunksize = v and ntasks = ln/v in
       (* flush everything *)
       flush_all ();
@@ -356,9 +362,11 @@ let mapper ncores ~chunksize compute opid al collect =
 
 let geniter ncores ~chunksize compute al =
   let ln = Array.length al in
+  let ncores = min ln (max 1 ncores) in
+  debug "geniter on %d elements, on %d cores%!" ln ncores;
   match chunksize with 
     None -> simpleiter ncores compute al (* no need of load balancing *)
-  | Some v when ncores=ln/v -> simpleiter ncores compute al (* no need of load balancing *)
+  | Some v when ncores >= ln/v -> simpleiter ncores compute al (* no need of load balancing *)
   | Some v -> 
       (* init task parameters *)
       let chunksize = v and ntasks = ln/v in
