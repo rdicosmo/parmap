@@ -159,3 +159,8 @@ val array_float_parmapi : ?ncores:int -> ?chunksize:int -> ?result: float array 
   (** Like array_float_parmap, but the map function gets as an extra argument
       the index of the mapped element *)
 
+(** {6 Debugging} *)
+
+val debugging : bool -> unit
+
+  (** Enable or disable debugging code in the library *)

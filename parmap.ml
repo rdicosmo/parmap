@@ -22,6 +22,10 @@ type 'a sequence = L of 'a list | A of 'a array
 
 let debug_enabled = ref false
 
+(* toggle debugging *)
+
+let debugging b = debug_enabled:=b
+
 (* try create the common directory used for stdin/stdout redirection *)
 
 let log_dir = ref (Printf.sprintf "/tmp/.parmap.%d" (Unix.getpid ()))
