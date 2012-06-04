@@ -109,21 +109,61 @@ let compute () = Parmap.parmap ~ncores:4 ~chunksize:1 pixel (Parmap.L tasks);;
 
 (*** Open the main graphics window and run the event loop *)
 
+open Sdlevent;;
+open Sdlkey;;
+open Sdlvideo;;
+
 Sdl.init [`VIDEO];;
 
 let (bpp, w, h) = (24, !n, !n);;
 let screen = Sdlvideo.set_video_mode ~w ~h ~bpp [];;
 
-(* a shadow surface for saving image areas *)
+(* two pixel deep surfaces for drawing and saving area borders *)
+(* one pixel for each border: two horizontal and two vertical  *)
 
-let shadowbuf = Sdlvideo.create_RGB_surface_format screen [`SWSURFACE] ~w ~h;;
+let shadowh = Sdlvideo.create_RGB_surface_format screen [`SWSURFACE] ~w ~h:2;;
+let shadowv = Sdlvideo.create_RGB_surface_format screen [`SWSURFACE] ~w:2 ~h;;
 
-(* draw h/v lines and a rectangle *)
+(* one pixel deep white surfaces for drawing area borders *)
 
-let draw_hline x y l col = for i = x to x+l do Sdlvideo.put_pixel_color ~x:i ~y screen col done;;
-let draw_vline x y l col = for j = y to y+l do Sdlvideo.put_pixel_color ~x ~y:j screen col done;;
-let draw_rect x y w h col =
-  draw_hline x y w col; draw_hline x (y+h) w col; draw_vline x y h col; draw_vline (x+w) y h col;;
+let whiteh = 
+  let surf = Sdlvideo.create_RGB_surface_format screen [`SWSURFACE] ~w ~h:1 in
+  for i = 0 to w-1 do Sdlvideo.put_pixel_color ~x:i ~y:0 surf Sdlvideo.white done;  
+  surf;;
+let whitev = 
+  let surf = Sdlvideo.create_RGB_surface_format screen [`SWSURFACE] ~w:1 ~h in
+  for i = 0 to h-1 do Sdlvideo.put_pixel_color ~x:0 ~y:i surf Sdlvideo.white done;
+  surf;;
+
+(* blit a rectangle border *)
+
+type action = Draw | Save | Restore | Update;;
+
+let border action x y w h = 
+Printf.eprintf "%s : x = %d y= %d w = %d h = %d\n" (match action with Draw -> "Draw" | Save -> "Save" | Restore -> "Restore" | Update -> "Update") x y w h;
+  let hrect1 = {r_x=x;r_y=y;r_w=w;r_h=1}
+  and vrect1 = {r_x=x;r_y=y;r_w=1;r_h=h}
+  and hrect2 = {r_x=x;r_y=y+h;r_w=w;r_h=1}
+  and vrect2 = {r_x=x+w;r_y=y;r_w=1;r_h=h}
+  in match action with
+    Draw -> 
+      blit_surface ~src:whiteh ~src_rect:{hrect1 with r_y=0;r_h=1} ~dst:screen ~dst_rect:hrect1 ();
+      blit_surface ~src:whiteh ~src_rect:{hrect2 with r_y=0;r_h=1} ~dst:screen ~dst_rect:hrect2 ();
+      blit_surface ~src:whitev ~src_rect:{vrect1 with r_x=0;r_w=1} ~dst:screen ~dst_rect:vrect1 ();
+      blit_surface ~src:whitev ~src_rect:{vrect2 with r_x=0;r_w=1} ~dst:screen ~dst_rect:vrect2 ()
+  | Save -> 
+      blit_surface ~dst:shadowh ~dst_rect:{hrect1 with r_y=0;r_h=1} ~src:screen ~src_rect:hrect1 ();
+      blit_surface ~dst:shadowh ~dst_rect:{hrect2 with r_y=1;r_h=1} ~src:screen ~src_rect:hrect2 ();
+      blit_surface ~dst:shadowv ~dst_rect:{vrect1 with r_x=0;r_w=1} ~src:screen ~src_rect:vrect1 ();
+      blit_surface ~dst:shadowv ~dst_rect:{vrect2 with r_x=1;r_w=1} ~src:screen ~src_rect:vrect2 ()
+  | Restore ->
+      blit_surface ~src:shadowh ~src_rect:{hrect1 with r_y=0;r_h=1} ~dst:screen ~dst_rect:hrect1 ();
+      blit_surface ~src:shadowh ~src_rect:{hrect2 with r_y=1;r_h=1} ~dst:screen ~dst_rect:hrect2 ();
+      blit_surface ~src:shadowv ~src_rect:{vrect1 with r_x=0;r_w=1} ~dst:screen ~dst_rect:vrect1 ();
+      blit_surface ~src:shadowv ~src_rect:{vrect2 with r_x=1;r_w=1} ~dst:screen ~dst_rect:vrect2 ()
+  | Update ->
+      List.iter (fun r -> Sdlvideo.update_rect ~rect:r screen) [hrect1;hrect2;vrect1;vrect2]
+;;    
 
 (* draw *)
 
@@ -146,16 +186,11 @@ let refine () = res:=!res*2; redraw ();;
 let unrefine () = res:=!res/2; redraw ();;
 let zoom_in () = rezoom (!n/4) (!n/4) (!n/2);;
 let zoom_out () = rezoom (-(!n/2)) (-(!n/2)) (!n*2);;
-let dumpnum = ref 0;;
 let dump () = 
   Printf.eprintf "Dumping image taken at ofx: %f ofy: %f scale: %f\n%!" !ofx !ofy !scale;
   Sdlvideo.save_BMP screen (Printf.sprintf "mandels-ofx-%f-ofy-%f-scale-%f.bmp" !ofx !ofy !scale);;
 
 (* encode state machine here *)
-
-open Sdlevent;;
-open Sdlkey;;
-open Sdlvideo;;
 
 let rec init () =
   match wait_event () with
@@ -182,17 +217,15 @@ and track_rect x y (ox,oy,ow,oh) =
     let bx,by,w,h = (min x x'), (min y y'), (abs (x'-x)), (abs (y'-y)) in
       (* restore old image if necessary *)
       if ow>0 & oh>0 then begin
-	let oldrect = {r_x=ox;r_y=oy;r_w=ow;r_h=oh} in
-	blit_surface ~src:shadowbuf ~src_rect:oldrect ~dst:screen ~dst_rect:oldrect ();
-        Sdlvideo.update_rect ~rect:oldrect screen;
+        border Restore ox oy ow oh;
+        border Update  ox oy ow oh
       end;
       (* save image if necessary *)
       if w>0 & h>0 then begin
-	let newrect = {r_x=bx;r_y=by;r_w=w;r_h=h} in
-	blit_surface ~src:screen ~src_rect:newrect ~dst:shadowbuf ~dst_rect:newrect ();
-	(* draw the border _inside_ the area *)
-	draw_rect bx by (w-1) (h-1) Sdlvideo.white;
-        Sdlvideo.update_rect ~rect:newrect screen;
+	border Save bx by w h;
+	(* draw the border *)
+	border Draw bx by w h;
+        border Update bx by w h;
       end;
     track_rect x y (bx,by,w,h)
 | _ -> track_rect x y (ox,oy,ow,oh)
