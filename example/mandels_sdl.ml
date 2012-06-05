@@ -19,6 +19,9 @@
 
 *)
 
+let ncores = ref 4;; (* how many core we use *)
+let chunksize = ref 1;; (* granularity *)
+
 let n   = ref 1000;; (* the size of the square screen windows in pixels      *)
 let res = ref 1000;; (* the resolution: maximum number of iterations allowed *)
 
@@ -105,7 +108,12 @@ let draw screen res = List.iter (fun c -> draw_line screen c) res;;
 
 (* compute *)
 
-let compute () = Parmap.parmap ~ncores:4 ~chunksize:1 pixel (Parmap.L tasks);;
+let compute () = 
+  let d = Unix.gettimeofday() in
+  let res = Parmap.parmap ~ncores: !ncores ~chunksize: !chunksize pixel (Parmap.L tasks) in
+  Printf.eprintf " [time: %f] %!" (Unix.gettimeofday() -. d);
+  res
+;;
 
 (*** Open the main graphics window and run the event loop *)
 
@@ -140,7 +148,6 @@ let whitev =
 type action = Draw | Save | Restore | Update;;
 
 let border action x y w h = 
-Printf.eprintf "%s : x = %d y= %d w = %d h = %d\n" (match action with Draw -> "Draw" | Save -> "Save" | Restore -> "Restore" | Update -> "Update") x y w h;
   let hrect1 = {r_x=x;r_y=y;r_w=w;r_h=1}
   and vrect1 = {r_x=x;r_y=y;r_w=1;r_h=h}
   and hrect2 = {r_x=x;r_y=y+h;r_w=w;r_h=1}
@@ -230,6 +237,15 @@ and track_rect x y (ox,oy,ow,oh) =
     track_rect x y (bx,by,w,h)
 | _ -> track_rect x y (ox,oy,ow,oh)
 ;;
+
+
+let _ = 
+  let getarg i = max 1 (int_of_string Sys.argv.(i)) in
+  try 
+    ncores := getarg 1;Printf.eprintf "Setting nproct = %d \n%!" !ncores;
+    chunksize := getarg 2;Printf.eprintf "Setting chunksize = %d \n%!" !chunksize
+  with _ -> ()
+  ;;
 
 redraw();;
 init()
