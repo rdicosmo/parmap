@@ -110,7 +110,12 @@ let draw screen res = List.iter (fun c -> draw_line screen c) res;;
 
 let compute () = 
   let d = Unix.gettimeofday() in
-  let res = Parmap.parmap ~ncores: !ncores ~chunksize: !chunksize pixel (Parmap.L tasks) in
+  let res = 
+    if !ncores > 1 then
+      Parmap.parmap ~ncores: !ncores ~chunksize: !chunksize pixel (Parmap.L tasks) 
+    else
+      List.map pixel tasks
+  in
   Printf.eprintf " [time: %f] %!" (Unix.gettimeofday() -. d);
   res
 ;;
@@ -242,7 +247,7 @@ and track_rect x y (ox,oy,ow,oh) =
 let _ = 
   let getarg i = max 1 (int_of_string Sys.argv.(i)) in
   try 
-    ncores := getarg 1;Printf.eprintf "Setting nproct = %d \n%!" !ncores;
+    ncores := getarg 1;Printf.eprintf "Setting nproc = %d \n%!" !ncores;
     chunksize := getarg 2;Printf.eprintf "Setting chunksize = %d \n%!" !chunksize
   with _ -> ()
   ;;
