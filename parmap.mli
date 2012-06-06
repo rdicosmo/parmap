@@ -24,6 +24,12 @@
     A specific primitive [array_float_parmap] is provided for fast operations on float arrays.
     *)
 
+(** {6 Setting and getting the default value for ncores } *)
+
+val set_default_ncores : int -> unit
+
+val get_default_ncores : unit -> int
+
 (** {6 Sequence type, subsuming lists and arrays} *)
 
 type 'a sequence = L of 'a list | A of 'a array;;

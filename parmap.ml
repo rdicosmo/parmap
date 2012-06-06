@@ -26,7 +26,14 @@ let debug_enabled = ref false
 
 let debugging b = debug_enabled:=b
 
-(* try create the common directory used for stdin/stdout redirection *)
+(* default number of cores, and a setter function *)
+
+let default_ncores=ref 2;;
+
+let set_default_ncores n = default_ncores := n;;
+let get_default_ncores () = !default_ncores;;
+
+(* try to create the common directory used for stdin/stdout redirection *)
 
 let log_dir = ref (Printf.sprintf "/tmp/.parmap.%d" (Unix.getpid ()))
 
@@ -449,7 +456,7 @@ let geniter ncores ~chunksize compute al =
 
 (* the parallel mapfold function *)
 
-let parmapifold ?(ncores=1) ?(chunksize) (f:int -> 'a -> 'b) (s:'a sequence) (op:'b->'c->'c) (opid:'c) (concat:'c->'c->'c) : 'c=
+let parmapifold ?(ncores= !default_ncores) ?(chunksize) (f:int -> 'a -> 'b) (s:'a sequence) (op:'b->'c->'c) (opid:'c) (concat:'c->'c->'c) : 'c=
   (* enforce array to speed up access to the list elements *)
   let al = match s with A al -> al | L l  -> Array.of_list l in
   let compute al lo hi previous exc_handler =
@@ -469,7 +476,7 @@ let parmapfold ?ncores ?(chunksize) (f:'a -> 'b) (s:'a sequence) (op:'b->'c->'c)
 
 (* the parallel map function *)
 
-let parmapi ?(ncores=1) ?chunksize (f:int ->'a -> 'b) (s:'a sequence) : 'b list=
+let parmapi ?(ncores= !default_ncores) ?chunksize (f:int ->'a -> 'b) (s:'a sequence) : 'b list=
   (* enforce array to speed up access to the list elements *)
   let al = match s with A al -> al | L l  -> Array.of_list l in
   let compute al lo hi previous exc_handler =
@@ -488,7 +495,7 @@ let parmap ?ncores ?chunksize (f:'a -> 'b) (s:'a sequence) : 'b list=
 
 (* the parallel fold function *)
 
-let parfold ?(ncores=1) ?chunksize (op:'a -> 'b -> 'b) (s:'a sequence) (opid:'b) (concat:'b->'b->'b) : 'b=
+let parfold ?(ncores= !default_ncores) ?chunksize (op:'a -> 'b -> 'b) (s:'a sequence) (opid:'b) (concat:'b->'b->'b) : 'b=
     parmapfold ~ncores ?chunksize (fun x -> x) s op opid concat
 
 (* the parallel map function, on arrays *)
@@ -504,7 +511,7 @@ let mapi_range lo hi (f:int -> 'a -> 'b) a =
     r
   end
 
-let array_parmapi ?(ncores=1) ?chunksize (f:int -> 'a -> 'b) (al:'a array) : 'b array=
+let array_parmapi ?(ncores= !default_ncores) ?chunksize (f:int -> 'a -> 'b) (al:'a array) : 'b array=
   let compute a lo hi previous exc_handler =
     try 
       Array.concat [(mapi_range lo hi f a);previous]
@@ -552,7 +559,7 @@ let init_shared_buffer a =
    *)
   Unix.close fd; (arr,size)
 
-let array_float_parmapi ?(ncores=1) ?chunksize ?result ?sharedbuffer (f:int -> 'a -> float) (al:'a array) : float array =
+let array_float_parmapi ?(ncores= !default_ncores) ?chunksize ?result ?sharedbuffer (f:int -> 'a -> float) (al:'a array) : float array =
   let size = Array.length al in
   let barr_out = 
     match sharedbuffer with
@@ -590,7 +597,7 @@ let array_float_parmap ?ncores ?chunksize ?result ?sharedbuffer (f:'a -> float) 
 
 (* the parallel iteration function *)
 
-let pariteri ?(ncores=1) ?chunksize (f:int -> 'a -> unit) (s:'a sequence) : unit=
+let pariteri ?(ncores= !default_ncores) ?chunksize (f:int -> 'a -> unit) (s:'a sequence) : unit=
   (* enforce array to speed up access to the list elements *)
   let al = match s with A al -> al | L l  -> Array.of_list l in
   let compute al lo hi exc_handler =
