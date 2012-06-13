@@ -113,6 +113,11 @@ let reopen_out outchan fname =
     end
   else ()
 
+(* send stdout and stderr to a file to avoid mixing output from different cores *)
+let redirect i =
+  reopen_out stdout (Printf.sprintf "stdout.%d" i);
+  reopen_out stderr (Printf.sprintf "stderr.%d" i);;
+
 (* unmarshal from a mmap seen as a bigarray *)
 let unmarshal fd =
  let a = Bigarray.Array1.map_file fd Bigarray.char Bigarray.c_layout true (-1) in
@@ -171,6 +176,7 @@ let simplemapper ncores compute opid al collect =
     match Unix.fork() with
       0 -> 
 	begin
+          redirect i; (* redirect stdout/stderr *)
           let lo=i*chunksize in
           let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
           let exc_handler e j = (* handle an exception at index j *)
@@ -216,6 +222,7 @@ let simpleiter ncores compute al =
     match Unix.fork() with
       0 -> 
 	begin
+          redirect i; (* redirect stdout/stderr *)
           let lo=i*chunksize in
           let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
           let exc_handler e j = (* handle an exception at index j *)
@@ -244,12 +251,9 @@ let simpleiter ncores compute al =
 type msg_to_master = Ready of int | Error of int * string
 type msg_to_worker = Finished | Task of int
 
-
 let setup_children_chans oc pipedown ?fdarr i = 
   Setcore.setcore i;
-  (* send stdout and stderr to a file to avoid mixing output from different cores *)
-  reopen_out stdout (Printf.sprintf "stdout.%d" i);
-  reopen_out stderr (Printf.sprintf "stderr.%d" i);
+  redirect i;
   (* close the other ends of the pipe and convert my ends to ic/oc *)
   Unix.close (snd pipedown.(i));
   let pid = Unix.getpid() in
