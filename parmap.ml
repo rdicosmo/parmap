@@ -22,9 +22,15 @@ type 'a sequence = L of 'a list | A of 'a array
 
 let debug_enabled = ref false
 
+let redirect_requested = ref false
+
 (* toggle debugging *)
 
 let debugging b = debug_enabled:=b
+
+(* toggle redirection *)
+
+let redirecting b = redirect_requested:=b
 
 (* default number of cores, and a setter function *)
 
@@ -37,7 +43,7 @@ let get_default_ncores () = !default_ncores;;
 
 let log_dir = ref (Printf.sprintf "/tmp/.parmap.%d" (Unix.getpid ()))
 
-let can_redirect = 
+let can_redirect () = 
   if not(Sys.file_exists !log_dir) then 
     try 
       Unix.mkdir !log_dir 0o777; true
@@ -102,7 +108,7 @@ let range startv endv =
 (* freopen emulation, from Xavier's suggestion on OCaml mailing list *)
 
 let reopen_out outchan fname =
-  if can_redirect then
+  if !redirect_requested && can_redirect() then
     begin
       flush outchan;
       let filename = Filename.concat !log_dir fname in
@@ -113,10 +119,10 @@ let reopen_out outchan fname =
     end
   else ()
 
-(* send stdout and stderr to a file to avoid mixing output from different cores *)
+(* send stdout and stderr to a file to avoid mixing output from different cores, if enabled *)
 let redirect i =
-  reopen_out stdout (Printf.sprintf "stdout.%d" i);
-  reopen_out stderr (Printf.sprintf "stderr.%d" i);;
+      reopen_out stdout (Printf.sprintf "stdout.%d" i);
+      reopen_out stderr (Printf.sprintf "stderr.%d" i);;
 
 (* unmarshal from a mmap seen as a bigarray *)
 let unmarshal fd =

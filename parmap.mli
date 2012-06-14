@@ -169,4 +169,13 @@ val array_float_parmapi : ?ncores:int -> ?chunksize:int -> ?result: float array 
 
 val debugging : bool -> unit
 
-  (** Enable or disable debugging code in the library *)
+  (** Enable or disable debugging code in the library; default: false *)
+
+(** {6 Redirection of stdout and stderr} *)
+
+val redirecting : bool -> unit
+
+  (** Enable or disable the redirection of the stdout and stderr. 
+      If enabled, the stdin and stdout in the workers will be redirected to
+      files located in the temporary directory /tmp, carrying names of the shape 
+      .parmap.XXXXX; default: false *)
