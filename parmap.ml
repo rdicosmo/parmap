@@ -280,189 +280,194 @@ let setup_children_chans oc pipedown ?fdarr i =
 
 let mapper ncores ~chunksize compute opid al collect =
   let ln = Array.length al in
-  let ncores = min ln (max 1 ncores) in
-  debug "mapper on %d elements, on %d cores%!" ln ncores;
-  match chunksize with 
-    None -> simplemapper ncores compute opid al collect (* no need of load balancing *)
-  | Some v when ncores >= ln/v -> simplemapper ncores compute opid al collect (* no need of load balancing if more cores than tasks *)
-  | Some v -> 
-      (* init task parameters : ntasks > 0 here, as otherwise ncores >= 1 >= ln/v = ntasks and we would take the branch above *)
-      let chunksize = v and ntasks = ln/v in
-      (* flush everything *)
-      flush_all ();
-      (* create descriptors to mmap *)
-      let fdarr=Array.init ncores (fun _ -> tempfd()) in
-      (* setup communication channel with the workers *)
-      let pipedown=Array.init ncores (fun _ -> Unix.pipe ()) in
-      let pipeup_rd,pipeup_wr=Unix.pipe () in
-      let oc_up = Unix.out_channel_of_descr pipeup_wr in
-      (* call the GC before forking *)
-      Gc.compact ();
-      (* spawn children *)
-      for i = 0 to ncores-1 do
-	match Unix.fork() with
-	  0 -> 
-	    begin    
-              let d=Unix.gettimeofday()  in
-              (* primitives for communication *)
-              Unix.close pipeup_rd;
-              let receive,signal,return,finish,pid = setup_children_chans oc_up pipedown ~fdarr i in
-              let reschunk=ref opid in
-              let computetask n = (* compute chunk number n *)
-		let lo=n*chunksize in
-		let hi=if n=ntasks-1 then ln-1 else (n+1)*chunksize-1 in
-		let exc_handler e j = (* handle an exception at index j *)
-		  begin
-		    let errmsg = Printexc.to_string e
-		    in info "error at index j=%d in (%d,%d), chunksize=%d of a total of %d got exception %s on core %d \n%!"
-		      j lo hi chunksize (hi-lo+1) errmsg i;
-		    signal (Error (i,errmsg)); finish()
-		  end
-		in		    
-		reschunk:= compute al lo hi !reschunk exc_handler;
-		info "worker on core %d (pid=%d), segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
-		  i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
-	      in
-	      while true do
-		(* ask for work until we are finished *)
-		signal (Ready i);
-		match receive() with
-		| Finished -> return (!reschunk:'d); finish ()
-		| Task n -> computetask n
-	      done;
-	    end
-	| -1 ->  info "fork error: pid %d; i=%d" (Unix.getpid()) i; 
-	| pid -> ()
-      done;
+  if ln=0 then (collect []) else 
+  begin
+   let ncores = min ln (max 1 ncores) in
+   debug "mapper on %d elements, on %d cores%!" ln ncores;
+   match chunksize with 
+     None -> simplemapper ncores compute opid al collect (* no need of load balancing *)
+   | Some v when ncores >= ln/v -> simplemapper ncores compute opid al collect (* no need of load balancing if more cores than tasks *)
+   | Some v -> 
+       (* init task parameters : ntasks > 0 here, as otherwise ncores >= 1 >= ln/v = ntasks and we would take the branch above *)
+       let chunksize = v and ntasks = ln/v in
+       (* flush everything *)
+       flush_all ();
+       (* create descriptors to mmap *)
+       let fdarr=Array.init ncores (fun _ -> tempfd()) in
+       (* setup communication channel with the workers *)
+       let pipedown=Array.init ncores (fun _ -> Unix.pipe ()) in
+       let pipeup_rd,pipeup_wr=Unix.pipe () in
+       let oc_up = Unix.out_channel_of_descr pipeup_wr in
+       (* call the GC before forking *)
+       Gc.compact ();
+       (* spawn children *)
+       for i = 0 to ncores-1 do
+         match Unix.fork() with
+           0 -> 
+             begin    
+               let d=Unix.gettimeofday()  in
+               (* primitives for communication *)
+               Unix.close pipeup_rd;
+               let receive,signal,return,finish,pid = setup_children_chans oc_up pipedown ~fdarr i in
+               let reschunk=ref opid in
+               let computetask n = (* compute chunk number n *)
+         	let lo=n*chunksize in
+         	let hi=if n=ntasks-1 then ln-1 else (n+1)*chunksize-1 in
+         	let exc_handler e j = (* handle an exception at index j *)
+         	  begin
+         	    let errmsg = Printexc.to_string e
+         	    in info "error at index j=%d in (%d,%d), chunksize=%d of a total of %d got exception %s on core %d \n%!"
+         	      j lo hi chunksize (hi-lo+1) errmsg i;
+         	    signal (Error (i,errmsg)); finish()
+         	  end
+         	in		    
+         	reschunk:= compute al lo hi !reschunk exc_handler;
+         	info "worker on core %d (pid=%d), segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
+         	  i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
+               in
+               while true do
+         	(* ask for work until we are finished *)
+         	signal (Ready i);
+         	match receive() with
+         	| Finished -> return (!reschunk:'d); finish ()
+         	| Task n -> computetask n
+               done;
+             end
+         | -1 ->  info "fork error: pid %d; i=%d" (Unix.getpid()) i; 
+         | pid -> ()
+       done;
 
-      (* close unused ends of the pipes *)
-      Array.iter (fun (rfd,_) -> Unix.close rfd) pipedown;
-      Unix.close pipeup_wr;
+       (* close unused ends of the pipes *)
+       Array.iter (fun (rfd,_) -> Unix.close rfd) pipedown;
+       Unix.close pipeup_wr;
 
-      (* get ic/oc/wfdl *)
-      let ocs=Array.init ncores (fun n -> Unix.out_channel_of_descr (snd pipedown.(n))) in
-      let ic=Unix.in_channel_of_descr pipeup_rd in
+       (* get ic/oc/wfdl *)
+       let ocs=Array.init ncores (fun n -> Unix.out_channel_of_descr (snd pipedown.(n))) in
+       let ic=Unix.in_channel_of_descr pipeup_rd in
 
-      (* feed workers until all tasks are finished *)
-      for i=0 to ntasks-1 do
-	match Marshal.from_channel ic with
-	  Ready w -> 
-	    (debug "sending task %d to worker %d" i w;
-	     let oc = ocs.(w) in
-	     (Marshal.to_channel oc (Task i) []); flush oc)
-	| Error (core,msg) -> (info "aborting due to exception on core %d: %s" core msg; exit 1)
-      done;
+       (* feed workers until all tasks are finished *)
+       for i=0 to ntasks-1 do
+         match Marshal.from_channel ic with
+           Ready w -> 
+             (debug "sending task %d to worker %d" i w;
+              let oc = ocs.(w) in
+              (Marshal.to_channel oc (Task i) []); flush oc)
+         | Error (core,msg) -> (info "aborting due to exception on core %d: %s" core msg; exit 1)
+       done;
 
-      (* send termination token to all children *)
-      Array.iter (fun oc -> 
-	Marshal.to_channel oc Finished []; 
-        flush oc; 
-        close_out oc
-      ) ocs;
+       (* send termination token to all children *)
+       Array.iter (fun oc -> 
+         Marshal.to_channel oc Finished []; 
+         flush oc; 
+         close_out oc
+       ) ocs;
 
-      (* wait for all children to terminate *)
-      for i = 0 to ncores-1 do 
-	try ignore(Unix.wait()) 
-	with Unix.Unix_error (Unix.ECHILD, _, _) -> ()
-      done;
+       (* wait for all children to terminate *)
+       for i = 0 to ncores-1 do 
+         try ignore(Unix.wait()) 
+         with Unix.Unix_error (Unix.ECHILD, _, _) -> ()
+       done;
 
-      (* read in all data *)
-      let res = ref [] in
-      (* iterate in reverse order, to accumulate in the right order *)
-      for i = 0 to ncores-1 do
-        res:= ((unmarshal fdarr.((ncores-1)-i)):'d)::!res;
-      done;
-      (* collect all results *)
-      collect !res
+       (* read in all data *)
+       let res = ref [] in
+       (* iterate in reverse order, to accumulate in the right order *)
+       for i = 0 to ncores-1 do
+         res:= ((unmarshal fdarr.((ncores-1)-i)):'d)::!res;
+       done;
+       (* collect all results *)
+       collect !res
+  end
 
 (* parametric iteration primitive that captures the parallel structure *)
 
 let geniter ncores ~chunksize compute al =
   let ln = Array.length al in
-  let ncores = min ln (max 1 ncores) in
-  debug "geniter on %d elements, on %d cores%!" ln ncores;
-  match chunksize with 
-    None -> simpleiter ncores compute al (* no need of load balancing *)
-  | Some v when ncores >= ln/v -> simpleiter ncores compute al (* no need of load balancing *)
-  | Some v -> 
-      (* init task parameters *)
-      let chunksize = v and ntasks = ln/v in
-      (* flush everything *)
-      flush_all ();
-      (* setup communication channel with the workers *)
-      let pipedown=Array.init ncores (fun _ -> Unix.pipe ()) in
-      let pipeup_rd,pipeup_wr=Unix.pipe () in
-      let oc_up = Unix.out_channel_of_descr pipeup_wr in
-      (* call the GC before forking *)
-      Gc.compact ();
-      (* spawn children *)
-      for i = 0 to ncores-1 do
-	match Unix.fork() with
-	  0 -> 
-	    begin    
-              let d=Unix.gettimeofday()  in
-              (* primitives for communication *)
-              Unix.close pipeup_rd;
-              let receive,signal,return,finish,pid = setup_children_chans oc_up pipedown i in
-              let computetask n = (* compute chunk number n *)
-		let lo=n*chunksize in
-		let hi=if n=ntasks-1 then ln-1 else (n+1)*chunksize-1 in
-		let exc_handler e j = (* handle an exception at index j *)
-		  begin
-		    let errmsg = Printexc.to_string e
-		    in info "error at index j=%d in (%d,%d), chunksize=%d of a total of %d got exception %s on core %d \n%!"
-		      j lo hi chunksize (hi-lo+1) errmsg i;
-		    signal (Error (i,errmsg)); finish()
-		  end
-		in		    
-		compute al lo hi exc_handler;
-		info "worker on core %d (pid=%d), segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
-		  i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
-	      in
-	      while true do
-		(* ask for work until we are finished *)
-		signal (Ready i);
-		match receive() with
-		| Finished -> return(); finish ()
-		| Task n -> computetask n
-	      done;
-	    end
-	| -1 ->  info "fork error: pid %d; i=%d" (Unix.getpid()) i; 
-	| pid -> ()
-      done;
+  if ln=0 then () else 
+  begin
+   let ncores = min ln (max 1 ncores) in
+   debug "geniter on %d elements, on %d cores%!" ln ncores;
+   match chunksize with 
+     None -> simpleiter ncores compute al (* no need of load balancing *)
+   | Some v when ncores >= ln/v -> simpleiter ncores compute al (* no need of load balancing *)
+   | Some v -> 
+       (* init task parameters *)
+       let chunksize = v and ntasks = ln/v in
+       (* flush everything *)
+       flush_all ();
+       (* setup communication channel with the workers *)
+       let pipedown=Array.init ncores (fun _ -> Unix.pipe ()) in
+       let pipeup_rd,pipeup_wr=Unix.pipe () in
+       let oc_up = Unix.out_channel_of_descr pipeup_wr in
+       (* call the GC before forking *)
+       Gc.compact ();
+       (* spawn children *)
+       for i = 0 to ncores-1 do
+ 	match Unix.fork() with
+ 	  0 -> 
+ 	    begin    
+               let d=Unix.gettimeofday()  in
+               (* primitives for communication *)
+               Unix.close pipeup_rd;
+               let receive,signal,return,finish,pid = setup_children_chans oc_up pipedown i in
+               let computetask n = (* compute chunk number n *)
+ 		let lo=n*chunksize in
+ 		let hi=if n=ntasks-1 then ln-1 else (n+1)*chunksize-1 in
+ 		let exc_handler e j = (* handle an exception at index j *)
+ 		  begin
+ 		    let errmsg = Printexc.to_string e
+ 		    in info "error at index j=%d in (%d,%d), chunksize=%d of a total of %d got exception %s on core %d \n%!"
+ 		      j lo hi chunksize (hi-lo+1) errmsg i;
+ 		    signal (Error (i,errmsg)); finish()
+ 		  end
+ 		in		    
+ 		compute al lo hi exc_handler;
+ 		info "worker on core %d (pid=%d), segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
+ 		  i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
+ 	      in
+ 	      while true do
+ 		(* ask for work until we are finished *)
+ 		signal (Ready i);
+ 		match receive() with
+ 		| Finished -> return(); finish ()
+ 		| Task n -> computetask n
+ 	      done;
+ 	    end
+ 	| -1 ->  info "fork error: pid %d; i=%d" (Unix.getpid()) i; 
+ 	| pid -> ()
+       done;
 
-      (* close unused ends of the pipes *)
-      Array.iter (fun (rfd,_) -> Unix.close rfd) pipedown;
-      Unix.close pipeup_wr;
+       (* close unused ends of the pipes *)
+       Array.iter (fun (rfd,_) -> Unix.close rfd) pipedown;
+       Unix.close pipeup_wr;
 
-      (* get ic/oc/wfdl *)
-      let ocs=Array.init ncores (fun n -> Unix.out_channel_of_descr (snd pipedown.(n))) in
-      let ic=Unix.in_channel_of_descr pipeup_rd in
+       (* get ic/oc/wfdl *)
+       let ocs=Array.init ncores (fun n -> Unix.out_channel_of_descr (snd pipedown.(n))) in
+       let ic=Unix.in_channel_of_descr pipeup_rd in
 
-      (* feed workers until all tasks are finished *)
-      for i=0 to ntasks-1 do
-	match Marshal.from_channel ic with
-	  Ready w -> 
-	    (debug "sending task %d to worker %d" i w;
-	     let oc = ocs.(w) in
-	     (Marshal.to_channel oc (Task i) []); flush oc)
-	| Error (core,msg) -> (info "aborting due to exception on core %d: %s" core msg; exit 1)
-      done;
+       (* feed workers until all tasks are finished *)
+       for i=0 to ntasks-1 do
+ 	match Marshal.from_channel ic with
+ 	  Ready w -> 
+ 	    (debug "sending task %d to worker %d" i w;
+ 	     let oc = ocs.(w) in
+ 	     (Marshal.to_channel oc (Task i) []); flush oc)
+ 	| Error (core,msg) -> (info "aborting due to exception on core %d: %s" core msg; exit 1)
+       done;
 
-      (* send termination token to all children *)
-      Array.iter (fun oc -> 
-	Marshal.to_channel oc Finished []; 
-        flush oc; 
-        close_out oc
-      ) ocs;
+       (* send termination token to all children *)
+       Array.iter (fun oc -> 
+ 	Marshal.to_channel oc Finished []; 
+         flush oc; 
+         close_out oc
+       ) ocs;
 
-      (* wait for all children to terminate *)
-      for i = 0 to ncores-1 do 
-	try ignore(Unix.wait()) 
-	with Unix.Unix_error (Unix.ECHILD, _, _) -> ()
-      done
-      (* no data to return *)
-
+       (* wait for all children to terminate *)
+       for i = 0 to ncores-1 do 
+ 	try ignore(Unix.wait()) 
+ 	with Unix.Unix_error (Unix.ECHILD, _, _) -> ()
+       done
+       (* no data to return *)
+  end
 
 (* the parallel mapfold function *)
 
@@ -571,36 +576,39 @@ let init_shared_buffer a =
 
 let array_float_parmapi ?(ncores= !default_ncores) ?chunksize ?result ?sharedbuffer (f:int -> 'a -> float) (al:'a array) : float array =
   let size = Array.length al in
-  let barr_out = 
-    match sharedbuffer with
-      Some (arr,s) -> 
-	if s<size then 
-	  (info "shared buffer is too small to hold the input in array_float_parmap"; raise WrongArraySize)
-	else arr
-    | None -> fst (init_shared_buffer al)
-  in
-  (* trick the compiler into accessing the Bigarray memory area as a float array:
-     the data in Bigarray is placed at offset 1 w.r.t. a normal array, so we
-     get a pointer to that zone into arr_out_as_array, and have it typed as a float
-     array *)
-  let barr_out_as_array = Array.unsafe_get (Obj.magic barr_out) 1 in
-  let compute _ lo hi _ exc_handler =
-    try
-      for i=lo to hi do 
-	Array.unsafe_set barr_out_as_array i (f i (Array.unsafe_get al i)) 
-      done
-    with e -> exc_handler e lo
-  in
-  mapper ncores ~chunksize compute () al (fun r -> ());
-  let res = 
-    match result with
-      None -> Bytearray.to_floatarray barr_out size
-    | Some a -> 
-	if Array.length a < size then
-	  (info "result array is too small to hold the result in array_float_parmap"; raise WrongArraySize)
-        else
-	  Bytearray.to_this_floatarray a barr_out size
-  in res
+  if size=0 then [| |] else
+  begin
+   let barr_out = 
+     match sharedbuffer with
+       Some (arr,s) -> 
+         if s<size then 
+           (info "shared buffer is too small to hold the input in array_float_parmap"; raise WrongArraySize)
+         else arr
+     | None -> fst (init_shared_buffer al)
+   in
+   (* trick the compiler into accessing the Bigarray memory area as a float array:
+      the data in Bigarray is placed at offset 1 w.r.t. a normal array, so we
+      get a pointer to that zone into arr_out_as_array, and have it typed as a float
+      array *)
+   let barr_out_as_array = Array.unsafe_get (Obj.magic barr_out) 1 in
+   let compute _ lo hi _ exc_handler =
+     try
+       for i=lo to hi do 
+         Array.unsafe_set barr_out_as_array i (f i (Array.unsafe_get al i)) 
+       done
+     with e -> exc_handler e lo
+   in
+   mapper ncores ~chunksize compute () al (fun r -> ());
+   let res = 
+     match result with
+       None -> Bytearray.to_floatarray barr_out size
+     | Some a -> 
+         if Array.length a < size then
+           (info "result array is too small to hold the result in array_float_parmap"; raise WrongArraySize)
+         else
+           Bytearray.to_this_floatarray a barr_out size
+   in res
+  end
 
 let array_float_parmap ?ncores ?chunksize ?result ?sharedbuffer (f:'a -> float) (al:'a array) : float array =
   array_float_parmapi ?ncores ?chunksize ?result ?sharedbuffer (fun _ x -> f x) al

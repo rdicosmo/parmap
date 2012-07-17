@@ -31,9 +31,18 @@ let fcompute p =
   !r
 ;;
 
+Printf.printf "*** Checking corner cases: call on empty lists and arrays must not raise an exception\n%!";
+Printf.printf "*   parmap []\n%!";
+parmap (fun x -> x) (L []);;
+Printf.printf "*   parmap [| |]\n%!";
+parmap (fun x -> x) (A [| |]);;
+Printf.printf "*   pariter []\n%!";
+pariter (fun x -> ()) (L []);;
+Printf.printf "*   pariter [| |]\n%!";
+pariter (fun x -> ()) (A [| |]);;
+
 
 Printf.printf "*** Checking the code for non tail recursive calls: an exception here indicates there are some left\n%!";
-
 scale_test (fun x -> x) (L (initsegm 10000000)) 1 2 2;;
 
 
