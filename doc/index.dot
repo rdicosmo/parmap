@@ -1,0 +1,8 @@
+digraph G {
+  size="10,7.5";
+  ratio="fill";
+  rotate=90;
+  fontsize="12pt";
+  rankdir = TB ;
+"Parmap" [style=filled, color=darkturquoise];
+}

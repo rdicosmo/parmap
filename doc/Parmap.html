@@ -1,0 +1,205 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link rel="Up" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Parmap" rel="Chapter" href="Parmap.html"><link title="Setting and getting the default value for ncores " rel="Section" href="#6_Settingandgettingthedefaultvalueforncores">
+<link title="Sequence type, subsuming lists and arrays" rel="Section" href="#6_Sequencetypesubsuminglistsandarrays">
+<link title="Parallel mapfold" rel="Section" href="#6_Parallelmapfold">
+<link title="Parallel fold" rel="Section" href="#6_Parallelfold">
+<link title="Parallel map" rel="Section" href="#6_Parallelmap">
+<link title="Parallel iteration" rel="Section" href="#6_Paralleliteration">
+<link title="Parallel mapfold, indexed" rel="Section" href="#6_Parallelmapfoldindexed">
+<link title="Parallel map" rel="Section" href="#6_Parallelmap">
+<link title="Parallel iteration, indexed" rel="Section" href="#6_Paralleliterationindexed">
+<link title="Parallel map on arrays" rel="Section" href="#6_Parallelmaponarrays">
+<link title="Parallel map on float arrays " rel="Section" href="#6_Parallelmaponfloatarrays">
+<link title="Debugging" rel="Section" href="#6_Debugging">
+<link title="Redirection of stdout and stderr" rel="Section" href="#6_Redirectionofstdoutandstderr">
+<title>Parmap</title>
+</head>
+<body>
+<div class="navbar">&nbsp;<a href="index.html">Up</a>
+&nbsp;</div>
+<center><h1>Module <a href="type_Parmap.html">Parmap</a></h1></center>
+<br>
+<pre><span class="keyword">module</span> Parmap: <code class="code">sig</code> <a href="Parmap.html">..</a> <code class="code">end</code></pre>Module <code class="code">Parmap</code>: efficient parallel map, fold and mapfold on lists and 
+    arrays on multicores. 
+<p>
+
+    All the primitives allow to control the granularity of the parallelism 
+    via an optional parameter <code class="code">chunksize</code>: if <code class="code">chunksize</code> is omitted, the
+    input sequence is split evenly among the available cores; if <code class="code">chunksize</code>
+    is specified, the input data is split in chunks of size <code class="code">chunksize</code> and
+    dispatched to the available cores using an on demand strategy that 
+    ensures automatic load balancing.
+<p>
+
+    A specific primitive <code class="code">array_float_parmap</code> is provided for fast operations on float arrays.<br>
+<hr width="100%">
+<br>
+<span id="6_Settingandgettingthedefaultvalueforncores"><h6>Setting and getting the default value for ncores </h6></span><br>
+<pre><span id="VALset_default_ncores"><span class="keyword">val</span> set_default_ncores</span> : <code class="type">int -> unit</code></pre><pre><span id="VALget_default_ncores"><span class="keyword">val</span> get_default_ncores</span> : <code class="type">unit -> int</code></pre><br>
+<span id="6_Sequencetypesubsuminglistsandarrays"><h6>Sequence type, subsuming lists and arrays</h6></span><br>
+<br><code><span id="TYPEsequence"><span class="keyword">type</span> <code class="type">'a</code> sequence</span> = </code><table class="typetable">
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span class="constructor">L</span> <span class="keyword">of</span> <code class="type">'a list</code></code></td>
+
+</tr>
+<tr>
+<td align="left" valign="top" >
+<code><span class="keyword">|</span></code></td>
+<td align="left" valign="top" >
+<code><span class="constructor">A</span> <span class="keyword">of</span> <code class="type">'a array</code></code></td>
+
+</tr></table>
+
+
+<br>
+The <code class="code">parmapfold</code>, <code class="code">parfold</code> and <code class="code">parmap</code> generic functions, for efficiency reasons,
+    convert the input data into an array internally, so we provide the <code class="code">'a sequence</code> type
+    to allow passing an array directly as input.
+    If you want to perform a parallel map operation on an array, use <code class="code">array_parmap</code> or <code class="code">array_float_parmap</code> instead.<br>
+<br>
+<span id="6_Parallelmapfold"><h6>Parallel mapfold</h6></span><br>
+<pre><span id="VALparmapfold"><span class="keyword">val</span> parmapfold</span> : <code class="type">?ncores:int -><br>       ?chunksize:int -><br>       ('a -> 'b) -><br>       'a <a href="Parmap.html#TYPEsequence">sequence</a> -> ('b -> 'c -> 'c) -> 'c -> ('c -> 'c -> 'c) -> 'c</code></pre><div class="info">
+<code class="code">parmapfold ~ncores:n f (L l) op b concat </code> computes <code class="code">List.fold_right op (List.map f l) b</code> 
+      by forking <code class="code">n</code> processes on a multicore machine. 
+      You need to provide the extra <code class="code">concat</code> operator to combine the partial results of the
+      fold computed on each core. If 'b = 'c, then <code class="code">concat</code> may be simply <code class="code">op</code>. 
+      The order of computation in parallel changes w.r.t. sequential execution, so this 
+      function is only correct if <code class="code">op</code> and <code class="code">concat</code> are associative and commutative.
+      If the optional <code class="code">chunksize</code> parameter is specified,
+      the processes compute the result in an on-demand fashion
+      on blocks of size <code class="code">chunksize</code>.
+      <code class="code">parmapfold ~ncores:n f (A a) op b concat </code> computes <code class="code">Array.fold_right op (Array.map f a) b</code><br>
+</div>
+<br>
+<span id="6_Parallelfold"><h6>Parallel fold</h6></span><br>
+<pre><span id="VALparfold"><span class="keyword">val</span> parfold</span> : <code class="type">?ncores:int -><br>       ?chunksize:int -><br>       ('a -> 'b -> 'b) -> 'a <a href="Parmap.html#TYPEsequence">sequence</a> -> 'b -> ('b -> 'b -> 'b) -> 'b</code></pre><div class="info">
+<code class="code">parfold ~ncores:n op (L l) b concat</code> computes <code class="code">List.fold_right op l b</code> 
+      by forking <code class="code">n</code> processes on a multicore machine.
+      You need to provide the extra <code class="code">concat</code> operator to combine the partial results of the
+      fold computed on each core. If 'b = 'c, then <code class="code">concat</code> may be simply <code class="code">op</code>. 
+      The order of computation in parallel changes w.r.t. sequential execution, so this 
+      function is only correct if <code class="code">op</code> and <code class="code">concat</code> are associative and commutative.
+      If the optional <code class="code">chunksize</code> parameter is specified,
+      the processes compute the result in an on-demand fashion
+      on blocks of size <code class="code">chunksize</code>.
+      <code class="code">parfold ~ncores:n op (A a) b concat</code> similarly computes <code class="code">Array.fold_right op a b</code>.<br>
+</div>
+<br>
+<span id="6_Parallelmap"><h6>Parallel map</h6></span><br>
+<pre><span id="VALparmap"><span class="keyword">val</span> parmap</span> : <code class="type">?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a <a href="Parmap.html#TYPEsequence">sequence</a> -> 'b list</code></pre><div class="info">
+<code class="code">parmap  ~ncores:n f (L l) </code> computes <code class="code">List.map f l</code> 
+      by forking <code class="code">n</code> processes on a multicore machine.
+      <code class="code">parmap  ~ncores:n f (A a) </code> computes <code class="code">Array.map f a</code> 
+      by forking <code class="code">n</code> processes on a multicore machine.
+      If the optional <code class="code">chunksize</code> parameter is specified,
+      the processes compute the result in an on-demand fashion
+      on blocks of size <code class="code">chunksize</code>; this provides automatic
+      load balancing for unbalanced computations, but the order
+      of the result is no longer guaranteed to be preserved.<br>
+</div>
+<br>
+<span id="6_Paralleliteration"><h6>Parallel iteration</h6></span><br>
+<pre><span id="VALpariter"><span class="keyword">val</span> pariter</span> : <code class="type">?ncores:int -> ?chunksize:int -> ('a -> unit) -> 'a <a href="Parmap.html#TYPEsequence">sequence</a> -> unit</code></pre><div class="info">
+<code class="code">pariter  ~ncores:n f (L l) </code> computes <code class="code">List.iter f l</code> 
+      by forking <code class="code">n</code> processes on a multicore machine.
+      <code class="code">parmap  ~ncores:n f (A a) </code> computes <code class="code">Array.iter f a</code> 
+      by forking <code class="code">n</code> processes on a multicore machine.
+      If the optional <code class="code">chunksize</code> parameter is specified,
+      the processes perform the computation in an on-demand fashion
+      on blocks of size <code class="code">chunksize</code>; this provides automatic
+      load balancing for unbalanced computations.<br>
+</div>
+<br>
+<span id="6_Parallelmapfoldindexed"><h6>Parallel mapfold, indexed</h6></span><br>
+<pre><span id="VALparmapifold"><span class="keyword">val</span> parmapifold</span> : <code class="type">?ncores:int -><br>       ?chunksize:int -><br>       (int -> 'a -> 'b) -><br>       'a <a href="Parmap.html#TYPEsequence">sequence</a> -> ('b -> 'c -> 'c) -> 'c -> ('c -> 'c -> 'c) -> 'c</code></pre><div class="info">
+Like parmapfold, but the map function gets as an extra argument
+      the index of the mapped element<br>
+</div>
+<br>
+<span id="6_Parallelmap"><h6>Parallel map</h6></span><br>
+<pre><span id="VALparmapi"><span class="keyword">val</span> parmapi</span> : <code class="type">?ncores:int -><br>       ?chunksize:int -> (int -> 'a -> 'b) -> 'a <a href="Parmap.html#TYPEsequence">sequence</a> -> 'b list</code></pre><div class="info">
+Like parmap, but the map function gets as an extra argument
+      the index of the mapped element<br>
+</div>
+<br>
+<span id="6_Paralleliterationindexed"><h6>Parallel iteration, indexed</h6></span><br>
+<pre><span id="VALpariteri"><span class="keyword">val</span> pariteri</span> : <code class="type">?ncores:int -><br>       ?chunksize:int -> (int -> 'a -> unit) -> 'a <a href="Parmap.html#TYPEsequence">sequence</a> -> unit</code></pre><div class="info">
+Like pariter, but the iterated function gets as an extra argument
+      the index of the sequence element<br>
+</div>
+<br>
+<span id="6_Parallelmaponarrays"><h6>Parallel map on arrays</h6></span><br>
+<pre><span id="VALarray_parmap"><span class="keyword">val</span> array_parmap</span> : <code class="type">?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a array -> 'b array</code></pre><div class="info">
+<code class="code">array_parmap  ~ncores:n f a </code> computes <code class="code">Array.map f a</code> 
+      by forking <code class="code">n</code> processes on a multicore machine.
+      If the optional <code class="code">chunksize</code> parameter is specified,
+      the processes compute the result in an on-demand fashion
+      on blochs of size <code class="code">chunksize</code>; this provides automatic
+      load balancing for unbalanced computations, but the order
+      of the result is no longer guaranteed to be preserved.<br>
+</div>
+<pre><span id="VALarray_parmapi"><span class="keyword">val</span> array_parmapi</span> : <code class="type">?ncores:int -> ?chunksize:int -> (int -> 'a -> 'b) -> 'a array -> 'b array</code></pre><div class="info">
+Like array_parmap, but the map function gets as an extra argument
+      the index of the mapped element<br>
+</div>
+<br>
+<span id="6_Parallelmaponfloatarrays"><h6>Parallel map on float arrays </h6></span><br>
+<pre><span id="EXCEPTIONWrongArraySize"><span class="keyword">exception</span> WrongArraySize</span></pre>
+<pre><span id="TYPEbuf"><span class="keyword">type</span> <code class="type"></code>buf</span> </pre>
+
+<pre><span id="VALinit_shared_buffer"><span class="keyword">val</span> init_shared_buffer</span> : <code class="type">float array -> <a href="Parmap.html#TYPEbuf">buf</a></code></pre><div class="info">
+<code class="code">init_shared_buffer a</code> creates a new memory mapped shared buffer big enough to hold a float array of the size of <code class="code">a</code>.
+      This buffer can be reused in a series of calls to <code class="code">array_float_parmap</code>, avoiding the cost of reallocating it each time.<br>
+</div>
+<pre><span id="VALarray_float_parmap"><span class="keyword">val</span> array_float_parmap</span> : <code class="type">?ncores:int -><br>       ?chunksize:int -><br>       ?result:float array -><br>       ?sharedbuffer:<a href="Parmap.html#TYPEbuf">buf</a> -> ('a -> float) -> 'a array -> float array</code></pre><div class="info">
+<code class="code">array_float_parmap  ~ncores:n f a </code> computes <code class="code">Array.map f a</code> by forking 
+      <code class="code">n</code> processes on a multicore machine, and preallocating the resulting
+      array as shared memory, which allows significantly more efficient
+      computation than calling the generic array_parmap function.  If the
+      optional <code class="code">chunksize</code> parameter is specified, the processes compute the
+      result in an on-demand fashion on blochs of size <code class="code">chunksize</code>; this
+      provides automatic load balancing for unbalanced computations, *and* the
+      order of the result is still guaranteed to be preserved.
+<p>
+
+      In case you already have at hand an array where to store the result, you
+      can squeeze out some more cpu cycles by passing it as optional parameter
+      <code class="code">result</code>: this will avoid the creation of a result array, which can be
+      costly for very large data sets. Raises <code class="code">WrongArraySize</code> if <code class="code">result</code> is too
+      small to hold the data.
+<p>
+
+      It is possible to share the same preallocated shared memory space across
+      calls, by initialising the space calling <code class="code">init_shared_buffer a</code> and
+      passing the result as the optional <code class="code">sharedbuffer</code> parameter to each
+      subsequent call to <code class="code">array_float_parmap</code>.  Raises WrongArraySize if
+      <code class="code">sharedbuffer</code> is too small to hold the input data.<br>
+</div>
+<pre><span id="VALarray_float_parmapi"><span class="keyword">val</span> array_float_parmapi</span> : <code class="type">?ncores:int -><br>       ?chunksize:int -><br>       ?result:float array -><br>       ?sharedbuffer:<a href="Parmap.html#TYPEbuf">buf</a> -> (int -> 'a -> float) -> 'a array -> float array</code></pre><br>
+Like array_float_parmap, but the map function gets as an extra argument
+      the index of the mapped element<br>
+<br>
+<span id="6_Debugging"><h6>Debugging</h6></span><br>
+<pre><span id="VALdebugging"><span class="keyword">val</span> debugging</span> : <code class="type">bool -> unit</code></pre><br>
+Enable or disable debugging code in the library; default: false<br>
+<br>
+<span id="6_Redirectionofstdoutandstderr"><h6>Redirection of stdout and stderr</h6></span><br>
+<pre><span id="VALredirecting"><span class="keyword">val</span> redirecting</span> : <code class="type">bool -> unit</code></pre><br>
+Enable or disable the redirection of the stdout and stderr. 
+      If enabled, the stdin and stdout in the workers will be redirected to
+      files located in the temporary directory /tmp, carrying names of the shape 
+      .parmap.XXXXX; default: false<br>
+</body></html>

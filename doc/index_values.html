@@ -1,0 +1,101 @@
+<html>
+<head>
+<link rel="stylesheet" href="style.css" type="text/css">
+<meta content="text/html; charset=iso-8859-1" http-equiv="Content-Type">
+<link rel="Start" href="index.html">
+<link title="Index of types" rel=Appendix href="index_types.html">
+<link title="Index of exceptions" rel=Appendix href="index_exceptions.html">
+<link title="Index of values" rel=Appendix href="index_values.html">
+<link title="Index of modules" rel=Appendix href="index_modules.html">
+<link title="Parmap" rel="Chapter" href="Parmap.html"><title>Index of values</title>
+</head>
+<body>
+<center><h1>Index of values</h1></center>
+<table>
+<tr><td align="left"><br>A</td></tr>
+<tr><td><a href="Parmap.html#VALarray_float_parmap">array_float_parmap</a> [<a href="Parmap.html">Parmap</a>]</td>
+<td><div class="info">
+<code class="code">array_float_parmap  ~ncores:n f a </code> computes <code class="code">Array.map f a</code> by forking 
+      <code class="code">n</code> processes on a multicore machine, and preallocating the resulting
+      array as shared memory, which allows significantly more efficient
+      computation than calling the generic array_parmap function.
+</div>
+</td></tr>
+<tr><td><a href="Parmap.html#VALarray_float_parmapi">array_float_parmapi</a> [<a href="Parmap.html">Parmap</a>]</td>
+<td></td></tr>
+<tr><td><a href="Parmap.html#VALarray_parmap">array_parmap</a> [<a href="Parmap.html">Parmap</a>]</td>
+<td><div class="info">
+<code class="code">array_parmap  ~ncores:n f a </code> computes <code class="code">Array.map f a</code> 
+      by forking <code class="code">n</code> processes on a multicore machine.
+</div>
+</td></tr>
+<tr><td><a href="Parmap.html#VALarray_parmapi">array_parmapi</a> [<a href="Parmap.html">Parmap</a>]</td>
+<td><div class="info">
+Like array_parmap, but the map function gets as an extra argument
+      the index of the mapped element
+</div>
+</td></tr>
+<tr><td align="left"><br>D</td></tr>
+<tr><td><a href="Parmap.html#VALdebugging">debugging</a> [<a href="Parmap.html">Parmap</a>]</td>
+<td></td></tr>
+<tr><td align="left"><br>G</td></tr>
+<tr><td><a href="Parmap.html#VALget_default_ncores">get_default_ncores</a> [<a href="Parmap.html">Parmap</a>]</td>
+<td></td></tr>
+<tr><td align="left"><br>I</td></tr>
+<tr><td><a href="Parmap.html#VALinit_shared_buffer">init_shared_buffer</a> [<a href="Parmap.html">Parmap</a>]</td>
+<td><div class="info">
+<code class="code">init_shared_buffer a</code> creates a new memory mapped shared buffer big enough to hold a float array of the size of <code class="code">a</code>.
+</div>
+</td></tr>
+<tr><td align="left"><br>P</td></tr>
+<tr><td><a href="Parmap.html#VALparfold">parfold</a> [<a href="Parmap.html">Parmap</a>]</td>
+<td><div class="info">
+<code class="code">parfold ~ncores:n op (L l) b concat</code> computes <code class="code">List.fold_right op l b</code> 
+      by forking <code class="code">n</code> processes on a multicore machine.
+</div>
+</td></tr>
+<tr><td><a href="Parmap.html#VALpariter">pariter</a> [<a href="Parmap.html">Parmap</a>]</td>
+<td><div class="info">
+<code class="code">pariter  ~ncores:n f (L l) </code> computes <code class="code">List.iter f l</code> 
+      by forking <code class="code">n</code> processes on a multicore machine.
+</div>
+</td></tr>
+<tr><td><a href="Parmap.html#VALpariteri">pariteri</a> [<a href="Parmap.html">Parmap</a>]</td>
+<td><div class="info">
+Like pariter, but the iterated function gets as an extra argument
+      the index of the sequence element
+</div>
+</td></tr>
+<tr><td><a href="Parmap.html#VALparmap">parmap</a> [<a href="Parmap.html">Parmap</a>]</td>
+<td><div class="info">
+<code class="code">parmap  ~ncores:n f (L l) </code> computes <code class="code">List.map f l</code> 
+      by forking <code class="code">n</code> processes on a multicore machine.
+</div>
+</td></tr>
+<tr><td><a href="Parmap.html#VALparmapfold">parmapfold</a> [<a href="Parmap.html">Parmap</a>]</td>
+<td><div class="info">
+<code class="code">parmapfold ~ncores:n f (L l) op b concat </code> computes <code class="code">List.fold_right op (List.map f l) b</code> 
+      by forking <code class="code">n</code> processes on a multicore machine.
+</div>
+</td></tr>
+<tr><td><a href="Parmap.html#VALparmapi">parmapi</a> [<a href="Parmap.html">Parmap</a>]</td>
+<td><div class="info">
+Like parmap, but the map function gets as an extra argument
+      the index of the mapped element
+</div>
+</td></tr>
+<tr><td><a href="Parmap.html#VALparmapifold">parmapifold</a> [<a href="Parmap.html">Parmap</a>]</td>
+<td><div class="info">
+Like parmapfold, but the map function gets as an extra argument
+      the index of the mapped element
+</div>
+</td></tr>
+<tr><td align="left"><br>R</td></tr>
+<tr><td><a href="Parmap.html#VALredirecting">redirecting</a> [<a href="Parmap.html">Parmap</a>]</td>
+<td></td></tr>
+<tr><td align="left"><br>S</td></tr>
+<tr><td><a href="Parmap.html#VALset_default_ncores">set_default_ncores</a> [<a href="Parmap.html">Parmap</a>]</td>
+<td></td></tr>
+</table><br>
+</body>
+</html>

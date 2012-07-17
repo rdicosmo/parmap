@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<title>Parmap : a minimally disruptive library for parallel map and reduce code in OCaml on multicore machines</title>
+<meta name="generator" content="Bluefish 2.0.1" />
+<meta name="author" content="dicosmo" />
+<meta name="date" content="2012-06-08T08:22:56+0200" />
+<meta name="copyright" content=""/>
+<meta name="keywords" content="ocaml, map, reduce"/>
+<meta name="description" content=""/>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8"/>
+<meta http-equiv="content-type" content="application/xhtml+xml; charset=UTF-8"/>
+<meta http-equiv="content-style-type" content="text/css"/>
+<meta http-equiv="expires" content="0"/>
+<meta />
+<style type="text/css">
+body
+{
+background-image:url('gradient2.png');
+background-repeat:repeat-x;
+}
+div.descr
+{
+width:800px;
+padding:10px;
+border:5px;
+margin:0px;
+}
+
+.descr p
+{
+padding-left: 30px;
+}
+.code
+{
+ padding-left: 60px;
+}
+.descr ol
+{
+ padding-left: 60px;
+}
+</style>
+
+</head>
+<body>
+<h1>Parmap</h1>
+
+<div align="left" class="descr" name="descr"><p>Parmap is a minimalistic library allowing to exploit multicore architectures for OCaml programs with minimal modifications.</p>
+<h2>Description</h2>
+
+<p>If you want to use your many cores to accelerate an operation which
+happens to be a map, fold or map/fold (map-reduce), just use Parmap's
+parmap, parfold and parmapfold primitives in place of the standard
+List.map and friends; you can specify the number of subprocesses to
+use with the optional parameter ncores, and the size of granularity
+of the parallel computation with the optional parameter chunksize.</p>
+
+<p>For example, in the classical Mandelbrot demo available in the example
+directory, the line</p>
+<div class="code">
+ <code>Parmap.parmap ~ncores: !ncores ~chunksize: !chunksize pixel (Parmap.L tasks)</code>
+</div>
+<p>allows to spawn <code>ncores</code> separate processes, each working on sublists of
+size <code>chunksize</code> of the tasks list.</p>
+
+<p>The library also provides highly efficient specialised functions for arrays of floats, as well as functions for iterating over a sequence.</p>
+<h2>Documentation</h2>
+<p>On top of <a href="doc" name="Parmap Ocamldoc">the standard ocamldoc output</a>, you can read this <a href="http://www.sciencedirect.com/science/article/pii/S1877050912003237" name="Parmap article at ICCS 2012">research article presenting Parmap</a>:</p>
+<menu>
+M. Danelutto, R. Di Cosmo, A “Minimal Disruption” Skeleton Experiment: Seamless Map &amp; Reduce Embedding in OCaml, Procedia Computer Science, Volume 9, 2012, Pages 1837-1846
+</menu>
+<h2>Development</h2>
+<menu>
+<li><strong>Git repository</strong>: <a href="https://gitorious.org/parmap" name="https://gitorious.org/parmap">https://gitorious.org/parmap</a></li>
+<li><strong>Developer mailing list</strong>: <a href="https://sympa.inria.fr/sympa/info/parmap-devel" name="https://sympa.inria.fr/sympa/info/parmap-devel">https://sympa.inria.fr/sympa/info/parmap-devel</a> </li>
+<li><strong>User mailing list</strong>: <a href="https://sympa.inria.fr/sympa/info/parmap-users" name="https://sympa.inria.fr/sympa/info/parmap-users">https://sympa.inria.fr/sympa/info/parmap-users</a> </li>
+<li><strong>Authors</strong>: <a href="http://backus.di.unipi.it/~marcod/wiki/doku.php?id=start">Marco Danelutto</a> and <a href="http://www.dicosmo.org">Roberto Di Cosmo</a></li>
+</menu>
+
+<h2>License</h2>
+
+Parmap is distributed under the LGPL licence version 2, with the usual special linking exception to section 6 for OCaml programs.
+
+
+<h2>Architectural notes</h2>
+
+
+
+<h3>DO'S and DONT'S</h3>
+
+<p>Parmap is not  meant to be a replacement  for a full fledged implementation of
+parallelism skeletons  (map, reduce, pipe, and the  many others described in the
+scientific literature   since the end   of the  1980's,   much earlier  than the
+specific   implementation by Google   engineers  that popularised them).  It  is
+meant,  instead, to allow you to  quickly leverage the  idle processing power of
+your extra cores, when handling some heavy computational load.</p>
+
+<p>The principle of parmap is very simple: when you call one of the three available
+primitives, map, fold, and  mapfold , your OCaml  sequential program forks  in n
+subprocesses (you choose the n), and each subprocess performs the computation on
+the 1/n of the data, in chunks  of a size you  can choose, returning the results
+through a shared memory area to the  parent process, that resumes execution once
+all the children have terminated, and the data has been recollected.</p>
+
+<p>You need  to run your  program on a single multicore  machine;  repeat after me:
+Parmap  is   not meant to   run  on a cluster,  see   one of the  many available
+(re)implementations of the map-reduce schema for that.</p>
+
+<p>By forking the parent process  on a sigle  machine, the children get access, for
+free, to all the data structures already built, even the imperative ones, and as
+far as your computation  inside the map/fold  does not produce side effects that
+need  to be  preserved, the  final result will   be the same  as  performing the
+sequential operation, the only difference is that you might get it faster.</p>
+
+<p>The OCaml  code is reasonably  simple and  only marginally relies  on external C
+libraries: most of the magic is done by your operating  system's fork and memory
+mapping   mechanisms.    One    could gain  some      speed  by implementing   a
+marshal/unmarshal operation directly on bigarrays, but we did not do this yet.</p>
+
+<p>Of course, if you happen  to have open  channels, or files, or other connections
+that should only be  used by the parent  process, your program  may behave in  a
+very wierd way: as an example, *do  not* open a  graphic window before calling a
+Parmap primitive, and   *do   not*  use  this  library   if  your  program    is
+multi-threaded!</p>
+
+<h3>Pinning processes to physical CPUs</h3>
+
+<p>To obtain maximum  speed,  Parmap tries to  pin  the worker processes to  a CPU,
+using  the scheduler  affinity  interface  that is  available   in recent  Linux
+kernels.   Similar functionality may be  obtained  on different platforms  using
+slightly different API. Contributions  are welcome to  support those other APIs,
+just make sure that you use autoconf properly.</p>
+
+<h3>Using Parmap with Ocamlnat</h3>
+
+<p>You can use Parmap in a native toplevel  (it may be quite useful  if you use the
+native toplevel to perform fast interactive computations), but remember that you
+need to load the .cmxs modules in it; an example is given in example/topnat.ml</p>
+
+<h3>Preservation of output order in Parmap</h3>
+
+<p>If the number of chunks is equal to the number of cores, it is easy to preserve
+the order of the elements of the sequence passed to the map/fold operations, so
+the result will be a list with the same order as if the sequential function would
+be applied to the input. This is what the parmap, parmafold and parfold functions
+do when the chunksize argument is not used.</p>
+
+<p>If the user specifies a chunksize that is different from the number of cores,
+there is no general way to preserve the ordering, so the result of calling
+Parmap.parmap f l are not necessarily in the same order as List.map f l.</p>
+
+<p>In general, using little chunksize helps in balancing the load among the workers,
+and provides better speed, at the price of losing the ordering: there is a
+tradeoff, and it is up to the user to choose the solution that better suits him/her.</p>
+
+<h3>Fast map on arrays and on float arrays</h3>
+
+<p>Visiting an array is much faster than visiting a list, and conversion of an array
+to and from a list is expensive, on large data structures, so we provide a specialised
+version of map on arrays, that beaves exactly like parmap.</p>
+
+<p>We also provide a highly optimised specialised parmap version that is targeted
+to float arrays, array_float_parmap, that allows you to perform parallel
+computation on very large float arrays efficiently, without the boxing/unboxing
+overhead introduced by the other primitives, including array_parmap.</p>
+
+<p>To understand the efficiency issues involved in the case of large arrays of float,
+here is a short summary of the steps that any implementation of a parallel map
+function must perform.</p>
+
+<ol>
+	<li>create a float array to hold the result of the computation.
+     This operation is expensive: on an Intel i7, creating a 10M float array
+     takes 50 milliseconds<br />
+     <code>
+     ocamlnat<br />
+          Objective Caml version 3.12.0 - native toplevel<br /><br />
+     # #load "unix.cmxs";;<br />
+     # let d = Unix.gettimeofday() in ignore(Array.create 10000000 0.); Unix.gettimeofday() -. d;;<br />
+     - : float = 0.0501301288604736328<br />
+     </code></li>
+	<li>create a shared memory area </li>
+	<li>possibly copy the result array to the shared memory area</li>
+	<li>perform the computation in the children writing the result in the shared memory area</li>
+	<li>possibly copy the result back to the OCaml array</li>
+
+</ol>
+<p>All implementations need to do 1, 2 and 4; steps 3 and/or 5 may be omitted depending on
+what the user wants to do with the result.</p>
+
+<p>The array_float_parmap performs steps 1,2,4 and 5. It is possible to share steps
+1 and 2 among subsequent calls to the parallel function by preallocating the result
+array and the shared memory buffer, and passing them as optional parameters to the
+array_float_parmap function: this may save a significant amount of time if the
+array is very large.</p>
+
+</div>
+
+</body>
+</html>
