@@ -101,7 +101,7 @@ val parmapifold : ?ncores:int -> ?chunksize:int -> (int -> 'a -> 'b) -> 'a seque
   (** Like parmapfold, but the map function gets as an extra argument
       the index of the mapped element *)
 
-(** {6 Parallel map} *)
+(** {6 Parallel map, indexed} *)
 
 val parmapi : ?ncores:int -> ?chunksize:int -> (int -> 'a -> 'b) -> 'a sequence -> 'b list
   (** Like parmap, but the map function gets as an extra argument
@@ -123,6 +123,8 @@ val array_parmap : ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a array -> 'b
       on blochs of size [chunksize]; this provides automatic
       load balancing for unbalanced computations, but the order
       of the result is no longer guaranteed to be preserved. *)
+
+(** {6 Parallel map on arrays, indexed} *)
 
 val array_parmapi : ?ncores:int -> ?chunksize:int -> (int -> 'a -> 'b) -> 'a array -> 'b array
   (** Like array_parmap, but the map function gets as an extra argument
@@ -159,6 +161,8 @@ val array_float_parmap : ?ncores:int -> ?chunksize:int -> ?result: float array -
       passing the result as the optional [sharedbuffer] parameter to each
       subsequent call to [array_float_parmap].  Raises WrongArraySize if
       [sharedbuffer] is too small to hold the input data. *)
+
+(** {6 Parallel map on float arrays, indexed } *)
 
 val array_float_parmapi : ?ncores:int -> ?chunksize:int -> ?result: float array -> ?sharedbuffer: buf -> (int -> 'a -> float) -> 'a array -> float array
 
