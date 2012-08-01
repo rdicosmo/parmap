@@ -322,7 +322,7 @@ let mapper ncores ~chunksize compute opid al collect =
          	  end
          	in		    
          	reschunk:= compute al lo hi !reschunk exc_handler;
-         	info "worker on core %d (pid=%d), segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
+         	debug "worker on core %d (pid=%d), segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
          	  i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
                in
                while true do
@@ -421,7 +421,7 @@ let geniter ncores ~chunksize compute al =
  		  end
  		in		    
  		compute al lo hi exc_handler;
- 		info "worker on core %d (pid=%d), segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
+ 		debug "worker on core %d (pid=%d), segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
  		  i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
  	      in
  	      while true do
