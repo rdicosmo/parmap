@@ -15,20 +15,20 @@ let concat_tr (l: 'a list) =
 
 (* tail recursive version of List.fold_right from ExtLib *)
 let fold_right f l init =
-        let fold_right_max = 1000 in
-        let rec tail_loop acc = function
-                | [] -> acc
-                | h :: t -> tail_loop (f h acc) t
-        in
-        let rec loop n = function
-                | [] -> init
-                | h :: t ->
-                        if n < fold_right_max then
-                                f h (loop (n+1) t)
-                        else
-                                f h (tail_loop init (List.rev t))
-        in
-        loop 0 l
+  let fold_right_max = 1000 in
+  let rec tail_loop acc = function
+          | [] -> acc
+          | h :: t -> tail_loop (f h acc) t
+  in
+  let rec loop n = function
+          | [] -> init
+          | h :: t ->
+                  if n < fold_right_max then
+                          f h (loop (n+1) t)
+                  else
+                          f h (tail_loop init (List.rev t))
+  in
+  loop 0 l
 
 (* would be [? a | a <- startv--endv] using list comprehension from Batteries *)
 let range startv endv =
