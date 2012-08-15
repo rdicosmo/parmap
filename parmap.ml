@@ -49,7 +49,7 @@ let can_redirect () =
       false
   else true
 
-let debug fmt =
+let log_debug fmt =
   Printf.kprintf (
     if !debug_enabled then begin
       (fun s -> Format.eprintf "[Parmap]: %s@." s)
@@ -123,7 +123,7 @@ let simplemapper ncores compute opid al collect =
   let ln = Array.length al in
   let ncores = min ln (max 1 ncores) in
   let chunksize = max 1 (ln/ncores) in
-  debug
+  log_debug
     "simplemapper on %d elements, on %d cores, chunksize = %d%!"
     ln ncores chunksize;
   (* create descriptors to mmap *)
@@ -175,7 +175,7 @@ let simpleiter ncores compute al =
   let ln = Array.length al in
   let ncores = min ln (max 1 ncores) in
   let chunksize = max 1 (ln/ncores) in
-  debug
+  log_debug
     "simplemapper on %d elements, on %d cores, chunksize = %d%!"
     ln ncores chunksize;
   (* call the GC before forking *)
@@ -226,9 +226,9 @@ let setup_children_chans oc pipedown ?fdarr i =
   let return v =
     let d = Unix.gettimeofday() in
     let _ = match fdarr with Some fdarr -> marshal fdarr.(i) v | None -> () in
-    debug "worker elapsed %f in marshalling" (Unix.gettimeofday() -. d) in
+    log_debug "worker elapsed %f in marshalling" (Unix.gettimeofday() -. d) in
   let finish () =
-    (debug "shutting down (pid=%d)\n%!" pid;
+    (log_debug "shutting down (pid=%d)\n%!" pid;
      try close_in ic; close_out oc with _ -> ()
     ); exit 0 in
   receive, signal, return, finish, pid
@@ -239,7 +239,7 @@ let mapper ncores ~chunksize compute opid al collect =
   if ln=0 then (collect []) else
   begin
    let ncores = min ln (max 1 ncores) in
-   debug "mapper on %d elements, on %d cores%!" ln ncores;
+   log_debug "mapper on %d elements, on %d cores%!" ln ncores;
    match chunksize with
      None ->
        (* no need of load balancing *)
@@ -288,7 +288,7 @@ let mapper ncores ~chunksize compute opid al collect =
          	  end
          	in
          	reschunk:= compute al lo hi !reschunk exc_handler;
-         	debug
+         	log_debug
                   "worker on core %d (pid=%d), segment (%d,%d) of data of \
                    length %d, chunksize=%d finished in %f seconds"
          	  i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
@@ -319,7 +319,7 @@ let mapper ncores ~chunksize compute opid al collect =
        for i=0 to ntasks-1 do
          match Marshal.from_channel ic with
            Ready w ->
-             (debug "sending task %d to worker %d" i w;
+             (log_debug "sending task %d to worker %d" i w;
               let oc = ocs.(w) in
               (Marshal.to_channel oc (Task i) []); flush oc)
          | Error (core,msg) ->
@@ -357,7 +357,7 @@ let geniter ncores ~chunksize compute al =
   if ln=0 then () else
   begin
    let ncores = min ln (max 1 ncores) in
-   debug "geniter on %d elements, on %d cores%!" ln ncores;
+   log_debug "geniter on %d elements, on %d cores%!" ln ncores;
    match chunksize with
      None ->
        simpleiter ncores compute al (* no need of load balancing *)
@@ -399,7 +399,7 @@ let geniter ncores ~chunksize compute al =
  		  end
  		in
  		compute al lo hi exc_handler;
- 		debug
+ 		log_debug
                   "worker on core %d (pid=%d), segment (%d,%d) of data \
                    of length %d, chunksize=%d finished in %f seconds"
  		  i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
@@ -429,7 +429,7 @@ let geniter ncores ~chunksize compute al =
        for i=0 to ntasks-1 do
  	match Marshal.from_channel ic with
  	  Ready w ->
- 	    (debug "sending task %d to worker %d" i w;
+ 	    (log_debug "sending task %d to worker %d" i w;
  	     let oc = ocs.(w) in
  	     (Marshal.to_channel oc (Task i) []); flush oc)
  	| Error (core,msg) ->
