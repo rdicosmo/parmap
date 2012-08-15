@@ -61,7 +61,7 @@ let debug fmt =
     end else ignore
   ) fmt
 
-let info fmt =
+let log_error fmt =
   Printf.kprintf (fun s -> Format.eprintf "[Parmap]: %s@." s) fmt
 
 (* utils *)
@@ -196,7 +196,7 @@ let simplemapper ncores compute opid al collect =
           let lo=i*chunksize in
           let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
           let exc_handler e j = (* handle an exception at index j *)
-	    info "error at index j=%d in (%d,%d), chunksize=%d \
+	    log_error "error at index j=%d in (%d,%d), chunksize=%d \
 of a total of %d got exception %s on core %d \n%!"
 	      j lo hi chunksize (hi-lo+1) (Printexc.to_string e) i;
 	    exit 1
@@ -205,7 +205,7 @@ of a total of %d got exception %s on core %d \n%!"
           marshal fdarr.(i) v;
           exit 0
 	end
-    | -1 -> info "fork error: pid %d; i=%d" (Unix.getpid()) i;
+    | -1 -> log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
     | pid -> ()
   done;
   (* wait for all children *)
@@ -245,7 +245,7 @@ let simpleiter ncores compute al =
           let lo=i*chunksize in
           let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
           let exc_handler e j = (* handle an exception at index j *)
-	    info "error at index j=%d in (%d,%d), chunksize=%d \
+	    log_error "error at index j=%d in (%d,%d), chunksize=%d \
 of a total of %d got exception %s on core %d \n%!"
 	      j lo hi chunksize (hi-lo+1) (Printexc.to_string e) i;
 	    exit 1
@@ -253,7 +253,7 @@ of a total of %d got exception %s on core %d \n%!"
 	  compute al lo hi exc_handler;
           exit 0
 	end
-    | -1 -> info "fork error: pid %d; i=%d" (Unix.getpid()) i;
+    | -1 -> log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
     | pid -> ()
   done;
   (* wait for all children *)
@@ -337,7 +337,7 @@ let mapper ncores ~chunksize compute opid al collect =
          	let exc_handler e j = (* handle an exception at index j *)
          	  begin
          	    let errmsg = Printexc.to_string e
-         	    in info "error at index j=%d in (%d,%d), \
+         	    in log_error "error at index j=%d in (%d,%d), \
 chunksize=%d of a total of %d got exception %s on core %d \n%!"
          	      j lo hi chunksize (hi-lo+1) errmsg i;
          	    signal (Error (i,errmsg)); finish()
@@ -356,7 +356,7 @@ segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
          	| Task n -> computetask n
                done;
              end
-         | -1 ->  info "fork error: pid %d; i=%d" (Unix.getpid()) i;
+         | -1 ->  log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
          | pid -> ()
        done;
 
@@ -378,7 +378,8 @@ segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
               let oc = ocs.(w) in
               (Marshal.to_channel oc (Task i) []); flush oc)
          | Error (core,msg) ->
-             (info "aborting due to exception on core %d: %s" core msg; exit 1)
+             (log_error "aborting due to exception on core %d: %s" core msg;
+              exit 1)
        done;
 
        (* send termination token to all children *)
@@ -444,7 +445,7 @@ let geniter ncores ~chunksize compute al =
  		let exc_handler e j = (* handle an exception at index j *)
  		  begin
  		    let errmsg = Printexc.to_string e
- 		    in info "error at index j=%d in (%d,%d), \
+ 		    in log_error "error at index j=%d in (%d,%d), \
 chunksize=%d of a total of %d got exception %s on core %d \n%!"
  		      j lo hi chunksize (hi-lo+1) errmsg i;
  		    signal (Error (i,errmsg)); finish()
@@ -463,7 +464,7 @@ segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
  		| Task n -> computetask n
  	      done;
  	    end
- 	| -1 ->  info "fork error: pid %d; i=%d" (Unix.getpid()) i;
+ 	| -1 ->  log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
  	| pid -> ()
        done;
 
@@ -484,7 +485,8 @@ segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
  	     let oc = ocs.(w) in
  	     (Marshal.to_channel oc (Task i) []); flush oc)
  	| Error (core,msg) ->
-            (info "aborting due to exception on core %d: %s" core msg; exit 1)
+            (log_error "aborting due to exception on core %d: %s" core msg;
+             exit 1)
        done;
 
        (* send termination token to all children *)
@@ -655,7 +657,7 @@ let array_float_parmapi
      match sharedbuffer with
        Some (arr,s) ->
          if s<size then
-           (info "shared buffer is too small to hold the input in \
+           (log_error "shared buffer is too small to hold the input in \
 array_float_parmap"; raise WrongArraySize)
          else arr
      | None -> fst (init_shared_buffer al)
@@ -678,7 +680,7 @@ array_float_parmap"; raise WrongArraySize)
        None -> Bytearray.to_floatarray barr_out size
      | Some a ->
          if Array.length a < size then
-           (info "result array is too small to hold the result in \
+           (log_error "result array is too small to hold the result in \
 array_float_parmap"; raise WrongArraySize)
          else
            Bytearray.to_this_floatarray a barr_out size
