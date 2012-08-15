@@ -11,10 +11,11 @@
 (*  library, see the LICENSE file for more information.                   *)
 (**************************************************************************)
 
+module Utils = Parmap_utils
+
 (* OS related constants *)
 
 (* sequence type, subsuming lists and arrays *)
-
 type 'a sequence = L of 'a list | A of 'a array
 
 let debug_enabled = ref false
@@ -22,11 +23,9 @@ let debug_enabled = ref false
 let redirect_requested = ref false
 
 (* toggle debugging *)
-
 let debugging b = debug_enabled:=b
 
 (* toggle redirection *)
-
 let redirecting b = redirect_requested:=b
 
 (* default number of cores, and a setter function *)
@@ -37,7 +36,6 @@ let set_default_ncores n = default_ncores := n;;
 let get_default_ncores () = !default_ncores;;
 
 (* try to create the common directory used for stdin/stdout redirection *)
-
 let log_dir = ref (Printf.sprintf "/tmp/.parmap.%d" (Unix.getpid ()))
 
 let can_redirect () =
@@ -46,8 +44,8 @@ let can_redirect () =
       Unix.mkdir !log_dir 0o777; true
     with Unix.Unix_error(e,s,s') ->
       (Printf.eprintf "[Pid %d]: Error creating %s : %s; proceeding without \
-stdout/stderr redirection\n%!"
-	  (Unix.getpid ()) !log_dir (Unix.error_message e));
+                       stdout/stderr redirection\n%!"
+	 (Unix.getpid ()) !log_dir (Unix.error_message e));
       false
   else true
 
@@ -58,53 +56,7 @@ let debug fmt =
     end else ignore
   ) fmt
 
-let log_error fmt =
-  Printf.kprintf (fun s -> Format.eprintf "[Parmap]: %s@." s) fmt
-
-(* utils *)
-
-(* tail recursive version of List.append *)
-
-let append_tr l1 l2 =
-  let rec aux acc = function
-      [] -> acc
-    | a::r -> aux (a::acc) r
-  in aux l2 (List.rev l1)
-
-(* tail recursive version of List.concat *)
-
-let concat_tr (l: 'a list) =
-  List.fold_left (fun acc l -> append_tr l acc) [] (List.rev l)
-
-(* tail recursive version of List.fold_right from ExtLib *)
-
-let fold_right_max = 1000
-
-let fold_right f l init =
-        let rec tail_loop acc = function
-                | [] -> acc
-                | h :: t -> tail_loop (f h acc) t
-        in
-        let rec loop n = function
-                | [] -> init
-                | h :: t ->
-                        if n < fold_right_max then
-                                f h (loop (n+1) t)
-                        else
-                                f h (tail_loop init (List.rev t))
-        in
-        loop 0 l
-
-(* would be [? a | a <- startv--endv] using list comprehension from Batteries *)
-
-let range startv endv =
-  let s,e = (min startv endv),(max startv endv) in
-  let rec aux acc = function n -> if n=s then n::acc else aux (n::acc) (n-1)
-  in aux [] e
-
-
 (* freopen emulation, from Xavier's suggestion on OCaml mailing list *)
-
 let reopen_out outchan fname =
   if !redirect_requested && can_redirect() then
     begin
@@ -131,7 +83,6 @@ let unmarshal fd =
  let res = Bytearray.unmarshal a 0 in
  Unix.close fd;
  res
-
 
 (* marshal to a mmap seen as a bigarray *)
 
@@ -163,16 +114,6 @@ let marshal fd v =
   let s = Marshal.to_string v [Marshal.Closures] in
   ignore(Bytearray.mmap_of_string fd s)
 
-(* create a shadow file descriptor *)
-
-let tempfd () =
-  let name = Filename.temp_file "mmap" "TMP" in
-  try
-    let fd = Unix.openfile name [Unix.O_RDWR; Unix.O_CREAT] 0o600 in
-    Unix.unlink name;
-    fd
-  with e -> Unix.unlink name; raise e
-
 (* a simple mapper function that computes 1/nth of the data on each of the n
    cores in one iteration *)
 let simplemapper ncores compute opid al collect =
@@ -182,10 +123,11 @@ let simplemapper ncores compute opid al collect =
   let ln = Array.length al in
   let ncores = min ln (max 1 ncores) in
   let chunksize = max 1 (ln/ncores) in
-  debug "simplemapper on %d elements, on %d cores, chunksize = %d%!"
-        ln ncores chunksize;
+  debug
+    "simplemapper on %d elements, on %d cores, chunksize = %d%!"
+    ln ncores chunksize;
   (* create descriptors to mmap *)
-  let fdarr=Array.init ncores (fun _ -> tempfd()) in
+  let fdarr=Array.init ncores (fun _ -> Utils.tempfd()) in
   (* call the GC before forking *)
   Gc.compact ();
   (* spawn children *)
@@ -197,8 +139,9 @@ let simplemapper ncores compute opid al collect =
           let lo=i*chunksize in
           let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
           let exc_handler e j = (* handle an exception at index j *)
-	    log_error "error at index j=%d in (%d,%d), chunksize=%d \
-of a total of %d got exception %s on core %d \n%!"
+	    Utils.log_error
+              "error at index j=%d in (%d,%d), chunksize=%d of a total of \
+               %d got exception %s on core %d \n%!"
 	      j lo hi chunksize (hi-lo+1) (Printexc.to_string e) i;
 	    exit 1
           in
@@ -206,7 +149,7 @@ of a total of %d got exception %s on core %d \n%!"
           marshal fdarr.(i) v;
           exit 0
 	end
-    | -1 -> log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
+    | -1  -> Utils.log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
     | pid -> ()
   done;
   (* wait for all children *)
@@ -225,7 +168,6 @@ of a total of %d got exception %s on core %d \n%!"
 
 (* a simple iteration function that iterates on 1/nth of the data on each of
    the n cores *)
-
 let simpleiter ncores compute al =
   (* flush everything *)
   flush_all();
@@ -233,8 +175,9 @@ let simpleiter ncores compute al =
   let ln = Array.length al in
   let ncores = min ln (max 1 ncores) in
   let chunksize = max 1 (ln/ncores) in
-  debug "simplemapper on %d elements, on %d cores, chunksize = %d%!"
-        ln ncores chunksize;
+  debug
+    "simplemapper on %d elements, on %d cores, chunksize = %d%!"
+    ln ncores chunksize;
   (* call the GC before forking *)
   Gc.compact ();
   (* spawn children *)
@@ -246,15 +189,16 @@ let simpleiter ncores compute al =
           let lo=i*chunksize in
           let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
           let exc_handler e j = (* handle an exception at index j *)
-	    log_error "error at index j=%d in (%d,%d), chunksize=%d \
-of a total of %d got exception %s on core %d \n%!"
+	    Utils.log_error
+              "error at index j=%d in (%d,%d), chunksize=%d of a total of \
+               %d got exception %s on core %d \n%!"
 	      j lo hi chunksize (hi-lo+1) (Printexc.to_string e) i;
 	    exit 1
           in
 	  compute al lo hi exc_handler;
           exit 0
 	end
-    | -1 -> log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
+    | -1  -> Utils.log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
     | pid -> ()
   done;
   (* wait for all children *)
@@ -264,11 +208,9 @@ of a total of %d got exception %s on core %d \n%!"
   done
   (* return with no value *)
 
-
 (* a more sophisticated mapper function, with automatic load balancing *)
 
 (* the type of messages exchanged between master and workers *)
-
 type msg_to_master = Ready of int | Error of int * string
 type msg_to_worker = Finished | Task of int
 
@@ -292,7 +234,6 @@ let setup_children_chans oc pipedown ?fdarr i =
   receive, signal, return, finish, pid
 
 (* parametric mapper primitive that captures the parallel structure *)
-
 let mapper ncores ~chunksize compute opid al collect =
   let ln = Array.length al in
   if ln=0 then (collect []) else
@@ -314,7 +255,7 @@ let mapper ncores ~chunksize compute opid al collect =
        (* flush everything *)
        flush_all ();
        (* create descriptors to mmap *)
-       let fdarr=Array.init ncores (fun _ -> tempfd()) in
+       let fdarr=Array.init ncores (fun _ -> Utils.tempfd()) in
        (* setup communication channel with the workers *)
        let pipedown=Array.init ncores (fun _ -> Unix.pipe ()) in
        let pipeup_rd,pipeup_wr=Unix.pipe () in
@@ -337,16 +278,19 @@ let mapper ncores ~chunksize compute opid al collect =
          	let hi=if n=ntasks-1 then ln-1 else (n+1)*chunksize-1 in
          	let exc_handler e j = (* handle an exception at index j *)
          	  begin
-         	    let errmsg = Printexc.to_string e
-         	    in log_error "error at index j=%d in (%d,%d), \
-chunksize=%d of a total of %d got exception %s on core %d \n%!"
+         	    let errmsg = Printexc.to_string e in
+                    Utils.log_error
+                      "error at index j=%d in (%d,%d), chunksize=%d of a \
+                       total of %d got exception %s on core %d \n%!"
          	      j lo hi chunksize (hi-lo+1) errmsg i;
-         	    signal (Error (i,errmsg)); finish()
+         	    signal (Error (i,errmsg));
+                    finish()
          	  end
          	in
          	reschunk:= compute al lo hi !reschunk exc_handler;
-         	debug "worker on core %d (pid=%d), \
-segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
+         	debug
+                  "worker on core %d (pid=%d), segment (%d,%d) of data of \
+                   length %d, chunksize=%d finished in %f seconds"
          	  i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
                in
                while true do
@@ -357,7 +301,7 @@ segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
          	| Task n -> computetask n
                done;
              end
-         | -1 ->  log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
+         | -1  -> Utils.log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
          | pid -> ()
        done;
 
@@ -379,7 +323,8 @@ segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
               let oc = ocs.(w) in
               (Marshal.to_channel oc (Task i) []); flush oc)
          | Error (core,msg) ->
-             (log_error "aborting due to exception on core %d: %s" core msg;
+             (Utils.log_error
+                "aborting due to exception on core %d: %s" core msg;
               exit 1)
        done;
 
@@ -407,7 +352,6 @@ segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
   end
 
 (* parametric iteration primitive that captures the parallel structure *)
-
 let geniter ncores ~chunksize compute al =
   let ln = Array.length al in
   if ln=0 then () else
@@ -445,16 +389,19 @@ let geniter ncores ~chunksize compute al =
  		let hi=if n=ntasks-1 then ln-1 else (n+1)*chunksize-1 in
  		let exc_handler e j = (* handle an exception at index j *)
  		  begin
- 		    let errmsg = Printexc.to_string e
- 		    in log_error "error at index j=%d in (%d,%d), \
-chunksize=%d of a total of %d got exception %s on core %d \n%!"
+ 		    let errmsg = Printexc.to_string e in
+                    Utils.log_error
+                      "error at index j=%d in (%d,%d), chunksize=%d of \
+                       a total of %d got exception %s on core %d \n%!"
  		      j lo hi chunksize (hi-lo+1) errmsg i;
- 		    signal (Error (i,errmsg)); finish()
+ 		    signal (Error (i,errmsg));
+                    finish()
  		  end
  		in
  		compute al lo hi exc_handler;
- 		debug "worker on core %d (pid=%d), \
-segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
+ 		debug
+                  "worker on core %d (pid=%d), segment (%d,%d) of data \
+                   of length %d, chunksize=%d finished in %f seconds"
  		  i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
  	      in
  	      while true do
@@ -465,7 +412,7 @@ segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
  		| Task n -> computetask n
  	      done;
  	    end
- 	| -1 ->  log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
+ 	| -1  -> Utils.log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
  	| pid -> ()
        done;
 
@@ -486,7 +433,8 @@ segment (%d,%d) of data of length %d, chunksize=%d finished in %f seconds"
  	     let oc = ocs.(w) in
  	     (Marshal.to_channel oc (Task i) []); flush oc)
  	| Error (core,msg) ->
-            (log_error "aborting due to exception on core %d: %s" core msg;
+            (Utils.log_error
+               "aborting due to exception on core %d: %s" core msg;
              exit 1)
        done;
 
@@ -527,7 +475,8 @@ let parmapifold
       with e -> exc_handler e j
     done; !r
   in
-  mapper ncores ~chunksize compute opid al  (fun r -> fold_right concat r opid)
+  mapper
+    ncores ~chunksize compute opid al (fun r -> Utils.fold_right concat r opid)
 
 let parmapfold
     ?ncores
@@ -560,7 +509,7 @@ let parmapi
 	| n ->  aux ((f' n)::acc) (n-1)
     in aux previous (hi-lo)
   in
-  mapper ncores ~chunksize compute [] al  (fun r -> concat_tr r)
+  mapper ncores ~chunksize compute [] al  (fun r -> Utils.concat_tr r)
 
 let parmap ?ncores ?chunksize (f:'a -> 'b) (s:'a sequence) : 'b list=
     parmapi ?ncores ?chunksize (fun _ x -> f x) s
@@ -633,7 +582,7 @@ type buf=
 
 let init_shared_buffer a =
   let size = Array.length a in
-  let fd = tempfd() in
+  let fd = Utils.tempfd() in
   let arr =
     Bigarray.Array1.map_file fd Bigarray.float64 Bigarray.c_layout true size in
 
@@ -658,8 +607,10 @@ let array_float_parmapi
      match sharedbuffer with
        Some (arr,s) ->
          if s<size then
-           (log_error "shared buffer is too small to hold the input in \
-array_float_parmap"; raise WrongArraySize)
+           (Utils.log_error
+              "shared buffer is too small to hold the input in \
+               array_float_parmap";
+            raise WrongArraySize)
          else arr
      | None -> fst (init_shared_buffer al)
    in
@@ -681,8 +632,10 @@ array_float_parmap"; raise WrongArraySize)
        None -> Bytearray.to_floatarray barr_out size
      | Some a ->
          if Array.length a < size then
-           (log_error "result array is too small to hold the result in \
-array_float_parmap"; raise WrongArraySize)
+           (Utils.log_error
+              "result array is too small to hold the result in \
+               array_float_parmap";
+            raise WrongArraySize)
          else
            Bytearray.to_this_floatarray a barr_out size
    in res
