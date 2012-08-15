@@ -13,9 +13,6 @@
 
 (* OS related constants *)
 
-(* a reasonable size for mmapping a file containing even huge result data *)
-let huge_size = if Sys.word_size = 64 then 1 lsl 32 else 1 lsl 26
-
 (* sequence type, subsuming lists and arrays *)
 
 type 'a sequence = L of 'a list | A of 'a array
@@ -139,6 +136,10 @@ let unmarshal fd =
 (* marshal to a mmap seen as a bigarray *)
 
 (* System dependent notes:
+
+    (* a reasonable size for mmapping a file containing even huge result data *)
+    let huge_size = if Sys.word_size = 64 then 1 lsl 32 else 1 lsl 26
+
     - on Linux kernels, we might allocate a mmapped memory area of huge_size
       and marshal into it directly
 
