@@ -5,7 +5,7 @@ CFLAGS=@CFLAGS@ -fPIC -Wall -pedantic -Werror -Wno-long-long
 CPPFLAGS=@CPPFLAGS@
 LDFLAGS=@LDFLAGS@
 
-OBJS = bytearray $(NAME)
+OBJS = bytearray parmap_utils $(NAME)
 INTF = $(foreach obj, $(OBJS),$(obj).cmi) setcore.cmi
 C_OBJS = bytearray_stubs.o setcore_stubs.o
 OBJECTS  = $(foreach obj, $(OBJS),$(obj).cmo)
