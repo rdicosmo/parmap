@@ -1,4 +1,4 @@
-AC_INIT(parmap, 0.9.9, roberto@dicosmo.org)
+AC_INIT(parmap, 1.0-rc1, roberto@dicosmo.org)
 
 AC_PROG_OCAML
 if test "$OCAMLC" = "no"; then

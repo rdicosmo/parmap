@@ -1,4 +1,5 @@
 <*>: package(unix), package(bigarray), package(parmap)
-<mandels.*>: package(graphics)
+<mandels*>: package(graphics)
 
 
+<mandels_sdl.*>: package(sdl)
