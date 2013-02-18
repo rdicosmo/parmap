@@ -65,7 +65,7 @@ examples:
 
 INSTALL_STUFF = META 
 INSTALL_STUFF += $(wildcard _build/*.cma _build/*.cmxa _build/*.cmxs)
-INSTALL_STUFF += $(wildcard _build/*.mli _build/*.cmi)
+INSTALL_STUFF += $(filter-out $(wildcard _build/myocamlbuild.*),$(wildcard _build/*.mli _build/*.cmi))
 INSTALL_STUFF += $(wildcard _build/*.so _build/*.a)
 
 install: $(LIBS) META
