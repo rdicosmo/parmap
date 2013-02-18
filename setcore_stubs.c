@@ -40,7 +40,7 @@ CAMLprim value setcore(value which) {
       affinityData.affinity_tag = w;
       retcode = thread_policy_set(mach_thread_self(),
                         THREAD_AFFINITY_POLICY,
-                        affinityData,
+                        &affinityData,
                         THREAD_AFFINITY_POLICY_COUNT);
       if(retcode) {
         fprintf(stderr,"MAC OS X: Failed pinning to cpu %d, trying %d/2\n",w, w);
