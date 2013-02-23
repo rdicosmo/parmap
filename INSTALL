@@ -13,10 +13,3 @@ autoconf
 autoheader
 ./configure
 make
-
--------------------------------------
-Users of OCaml version 3.11 will not
-be able to use the standard makefile
-due to changes in ocamlbuild.
-
-Use make -f Makefile_3.11 instead.
