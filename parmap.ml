@@ -23,17 +23,27 @@ let debug_enabled = ref false
 let redirect_requested = ref false
 
 (* toggle debugging *)
-let debugging b = debug_enabled:=b
+let debugging b = debug_enabled := b
 
 (* toggle redirection *)
-let redirecting b = redirect_requested:=b
+let redirecting b = redirect_requested := b
+
+(* children process IDs created by fork *)
+let children = ref []
+
+(* reset children pids list *)
+let forget_children () = children := []
+
+let one_more_child pid = children := pid :: !children
+
+let get_children_pids () = !children
 
 (* default number of cores, and a setter function *)
+let default_ncores = ref 2
 
-let default_ncores=ref 2;;
+let set_default_ncores n = default_ncores := n
 
-let set_default_ncores n = default_ncores := n;;
-let get_default_ncores () = !default_ncores;;
+let get_default_ncores () = !default_ncores
 
 (* try to create the common directory used for stdin/stdout redirection *)
 let log_dir = ref (Printf.sprintf "/tmp/.parmap.%d" (Unix.getpid ()))
@@ -128,6 +138,7 @@ let simplemapper ncores compute opid al collect =
     ln ncores chunksize;
   (* create descriptors to mmap *)
   let fdarr=Array.init ncores (fun _ -> Utils.tempfd()) in
+  forget_children ();
   (* call the GC before forking *)
   Gc.compact ();
   (* spawn children *)
@@ -150,7 +161,7 @@ let simplemapper ncores compute opid al collect =
           exit 0
 	end
     | -1  -> Utils.log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
-    | pid -> ()
+    | pid -> one_more_child pid
   done;
   (* wait for all children *)
   for i = 0 to ncores-1 do
@@ -161,7 +172,7 @@ let simplemapper ncores compute opid al collect =
   let res = ref [] in
   (* iterate in reverse order, to accumulate in the right order *)
   for i = 0 to ncores-1 do
-      res:= ((unmarshal fdarr.((ncores-1)-i)):'d)::!res;
+      res := ((unmarshal fdarr.((ncores-1)-i)):'d)::!res;
   done;
   (* collect all results *)
   collect !res
@@ -178,6 +189,7 @@ let simpleiter ncores compute al =
   log_debug
     "simplemapper on %d elements, on %d cores, chunksize = %d%!"
     ln ncores chunksize;
+  forget_children ();
   (* call the GC before forking *)
   Gc.compact ();
   (* spawn children *)
@@ -199,7 +211,7 @@ let simpleiter ncores compute al =
           exit 0
 	end
     | -1  -> Utils.log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
-    | pid -> ()
+    | pid -> one_more_child pid
   done;
   (* wait for all children *)
   for i = 0 to ncores-1 do
@@ -260,6 +272,7 @@ let mapper ncores ~chunksize compute opid al collect =
        let pipedown=Array.init ncores (fun _ -> Unix.pipe ()) in
        let pipeup_rd,pipeup_wr=Unix.pipe () in
        let oc_up = Unix.out_channel_of_descr pipeup_wr in
+       forget_children ();
        (* call the GC before forking *)
        Gc.compact ();
        (* spawn children *)
@@ -287,7 +300,7 @@ let mapper ncores ~chunksize compute opid al collect =
                     finish()
          	  end
          	in
-         	reschunk:= compute al lo hi !reschunk exc_handler;
+         	reschunk := compute al lo hi !reschunk exc_handler;
          	log_debug
                   "worker on core %d (pid=%d), segment (%d,%d) of data of \
                    length %d, chunksize=%d finished in %f seconds"
@@ -302,7 +315,7 @@ let mapper ncores ~chunksize compute opid al collect =
                done;
              end
          | -1  -> Utils.log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
-         | pid -> ()
+         | pid -> one_more_child pid
        done;
 
        (* close unused ends of the pipes *)
@@ -345,7 +358,7 @@ let mapper ncores ~chunksize compute opid al collect =
        let res = ref [] in
        (* iterate in reverse order, to accumulate in the right order *)
        for i = 0 to ncores-1 do
-         res:= ((unmarshal fdarr.((ncores-1)-i)):'d)::!res;
+         res := ((unmarshal fdarr.((ncores-1)-i)):'d)::!res;
        done;
        (* collect all results *)
        collect !res
@@ -372,6 +385,7 @@ let geniter ncores ~chunksize compute al =
        let pipedown=Array.init ncores (fun _ -> Unix.pipe ()) in
        let pipeup_rd,pipeup_wr=Unix.pipe () in
        let oc_up = Unix.out_channel_of_descr pipeup_wr in
+       forget_children ();
        (* call the GC before forking *)
        Gc.compact ();
        (* spawn children *)
@@ -413,7 +427,7 @@ let geniter ncores ~chunksize compute al =
  	      done;
  	    end
  	| -1  -> Utils.log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
- 	| pid -> ()
+        | pid -> one_more_child pid
        done;
 
        (* close unused ends of the pipes *)
