@@ -183,3 +183,13 @@ val redirecting : bool -> unit
       If enabled, the stdin and stdout in the workers will be redirected to
       files located in the temporary directory /tmp, carrying names of the shape 
       .parmap.XXXXX; default: false *)
+
+(** {6 Process IDs accounting} *)
+
+val get_children_pids : unit -> int list
+(** List process IDs created by fork() calls.
+    This pid list will be reset once a new session of forking starts
+    (internal functions simplemapper, simpleiter, mapper and geniter).
+    Be aware that the corresponding processes may already have been waited for
+    when you try to signal them (pid numbers can also wrap around if you
+    wait long enough). *)
