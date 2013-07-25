@@ -5,12 +5,6 @@ if test "$OCAMLC" = "no"; then
  AC_MSG_ERROR([You must install the OCaml compiler])
 fi
 
-AC_PROG_CAMLP4
-AC_SUBST(CAMLP4O)
-if test "$CAMLP4" = "no"; then
- AC_MSG_ERROR([You must install the Camlp4 pre-processor])
-fi
-
 AC_PROG_FINDLIB
 AC_SUBST(OCAMLFIND)
 if test "$OCAMLFIND" = "no"; then
