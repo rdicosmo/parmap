@@ -30,7 +30,7 @@ let redirecting b = redirect_requested:=b
 
 (* default number of cores, and a setter function *)
 
-let default_ncores=ref 2;;
+let default_ncores=ref (max 2 (Setcore.numcores()-1));;
 
 let set_default_ncores n = default_ncores := n;;
 let get_default_ncores () = !default_ncores;;

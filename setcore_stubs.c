@@ -13,6 +13,11 @@
 #include <errno.h>
 #include <caml/mlvalues.h>
 
+CAMLprim value numcores(value unit) {
+  int numcores = sysconf( _SC_NPROCESSORS_ONLN );
+  return Val_int(numcores);
+}
+
 CAMLprim value setcore(value which) {
   int numcores = sysconf( _SC_NPROCESSORS_ONLN );
   int w = Int_val(which) % numcores; // stay in the space of existing cores
