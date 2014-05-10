@@ -173,7 +173,7 @@ let simplemapper (init:int -> unit) (finalize: unit -> unit) ncores compute opid
 
 (* a simple iteration function that iterates on 1/nth of the data on each of
    the n cores *)
-let simpleiter ncores compute al =
+let simpleiter init finalize ncores compute al =
   (* flush everything *)
   flush_all();
   (* init task parameters *)
@@ -219,7 +219,7 @@ let simpleiter ncores compute al =
 type msg_to_master = Ready of int | Error of int * string
 type msg_to_worker = Finished | Task of int
 
-let setup_children_chans oc pipedown ?fdarr i =
+let setup_children_chans oc pipedown finalize ?fdarr i =
   Setcore.setcore i;
   redirect i;
   (* close the other ends of the pipe and convert my ends to ic/oc *)
@@ -248,10 +248,10 @@ let mapper (init:int -> unit) (finalize:unit -> unit) ncores ~chunksize compute 
    match chunksize with
      None ->
        (* no need of load balancing *)
-       simplemapper ncores compute opid al collect
+       simplemapper init finalize ncores compute opid al collect
    | Some v when ncores >= ln/v ->
        (* no need of load balancing if more cores than tasks *)
-       simplemapper ncores compute opid al collect
+       simplemapper init finalize ncores compute opid al collect
    | Some v ->
        (* init task parameters : ntasks > 0 here,
           as otherwise ncores >= 1 >= ln/v = ntasks and we would take
@@ -276,7 +276,7 @@ let mapper (init:int -> unit) (finalize:unit -> unit) ncores ~chunksize compute 
                (* primitives for communication *)
                Unix.close pipeup_rd;
                let receive,signal,return,finish,pid =
-                 setup_children_chans oc_up pipedown ~fdarr i in
+                 setup_children_chans oc_up pipedown finalize ~fdarr i in
                let reschunk=ref opid in
                let computetask n = (* compute chunk number n *)
          	let lo=n*chunksize in
@@ -354,7 +354,7 @@ let mapper (init:int -> unit) (finalize:unit -> unit) ncores ~chunksize compute 
   end
 
 (* parametric iteration primitive that captures the parallel structure *)
-let geniter ncores ~chunksize compute al =
+let geniter init finalize ncores ~chunksize compute al =
   let ln = Array.length al in
   if ln=0 then () else
   begin
@@ -362,9 +362,9 @@ let geniter ncores ~chunksize compute al =
    log_debug "geniter on %d elements, on %d cores%!" ln ncores;
    match chunksize with
      None ->
-       simpleiter ncores compute al (* no need of load balancing *)
+       simpleiter init finalize ncores compute al (* no need of load balancing *)
    | Some v when ncores >= ln/v ->
-       simpleiter ncores compute al (* no need of load balancing *)
+       simpleiter init finalize ncores compute al (* no need of load balancing *)
    | Some v ->
        (* init task parameters *)
        let chunksize = v and ntasks = ln/v in
@@ -385,7 +385,7 @@ let geniter ncores ~chunksize compute al =
                (* primitives for communication *)
                Unix.close pipeup_rd;
                let receive,signal,return,finish,pid =
-                 setup_children_chans oc_up pipedown i in
+                 setup_children_chans oc_up pipedown finalize i in
                let computetask n = (* compute chunk number n *)
  		let lo=n*chunksize in
  		let hi=if n=ntasks-1 then ln-1 else (n+1)*chunksize-1 in
@@ -684,7 +684,7 @@ let pariteri
       f' i
     done
   in
-  geniter ncores ~chunksize compute al
+  geniter init finalize ncores ~chunksize compute al
 
 let pariter ?init ?finalize ?ncores ?chunksize (f:'a -> unit) (s:'a sequence) : unit=
   pariteri ?init ?finalize ?ncores ?chunksize (fun _ x -> f x) s
