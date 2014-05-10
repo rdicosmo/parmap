@@ -42,7 +42,7 @@ type 'a sequence = L of 'a list | A of 'a array;;
 
 (** {6 Parallel mapfold} *)
 
-val parmapfold : ?init:(unit -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a sequence -> ('b-> 'c -> 'c) -> 'c -> ('c->'c->'c) -> 'c
+val parmapfold : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a sequence -> ('b-> 'c -> 'c) -> 'c -> ('c->'c->'c) -> 'c
   (** [parmapfold ~ncores:n f (L l) op b concat ] computes [List.fold_right op (List.map f l) b] 
       by forking [n] processes on a multicore machine. 
       You need to provide the extra [concat] operator to combine the partial results of the
@@ -57,7 +57,7 @@ val parmapfold : ?init:(unit -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int
 
 (** {6 Parallel fold} *)
 
-val parfold: ?init:(unit -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ('a -> 'b -> 'b) -> 'a sequence -> 'b -> ('b->'b->'b) -> 'b
+val parfold: ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ('a -> 'b -> 'b) -> 'a sequence -> 'b -> ('b->'b->'b) -> 'b
   (** [parfold ~ncores:n op (L l) b concat] computes [List.fold_right op l b] 
       by forking [n] processes on a multicore machine.
       You need to provide the extra [concat] operator to combine the partial results of the
@@ -72,7 +72,7 @@ val parfold: ?init:(unit -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> 
 
 (** {6 Parallel map} *)
 
-val parmap : ?init:(unit -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a sequence -> 'b list
+val parmap : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a sequence -> 'b list
   (** [parmap  ~ncores:n f (L l) ] computes [List.map f l] 
       by forking [n] processes on a multicore machine.
       [parmap  ~ncores:n f (A a) ] computes [Array.map f a] 
@@ -85,7 +85,7 @@ val parmap : ?init:(unit -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> 
 
 (** {6 Parallel iteration} *)
 
-val pariter : ?init:(unit -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ('a -> unit) -> 'a sequence -> unit
+val pariter : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ('a -> unit) -> 'a sequence -> unit
   (** [pariter  ~ncores:n f (L l) ] computes [List.iter f l] 
       by forking [n] processes on a multicore machine.
       [parmap  ~ncores:n f (A a) ] computes [Array.iter f a] 
@@ -97,25 +97,25 @@ val pariter : ?init:(unit -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int ->
 
 (** {6 Parallel mapfold, indexed} *)
 
-val parmapifold : ?init:(unit -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> (int -> 'a -> 'b) -> 'a sequence -> ('b-> 'c -> 'c) -> 'c -> ('c->'c->'c) -> 'c
+val parmapifold : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> (int -> 'a -> 'b) -> 'a sequence -> ('b-> 'c -> 'c) -> 'c -> ('c->'c->'c) -> 'c
   (** Like parmapfold, but the map function gets as an extra argument
       the index of the mapped element *)
 
 (** {6 Parallel map, indexed} *)
 
-val parmapi : ?init:(unit -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> (int -> 'a -> 'b) -> 'a sequence -> 'b list
+val parmapi : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> (int -> 'a -> 'b) -> 'a sequence -> 'b list
   (** Like parmap, but the map function gets as an extra argument
       the index of the mapped element *)
 
 (** {6 Parallel iteration, indexed} *)
 
-val pariteri : ?init:(unit -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> (int -> 'a -> unit) -> 'a sequence -> unit
+val pariteri : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> (int -> 'a -> unit) -> 'a sequence -> unit
   (** Like pariter, but the iterated function gets as an extra argument
       the index of the sequence element *)
 
 (** {6 Parallel map on arrays} *)
 
-val array_parmap : ?init:(unit -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a array -> 'b array
+val array_parmap : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a array -> 'b array
   (** [array_parmap  ~ncores:n f a ] computes [Array.map f a] 
       by forking [n] processes on a multicore machine.
       If the optional [chunksize] parameter is specified,
@@ -126,7 +126,7 @@ val array_parmap : ?init:(unit -> unit) -> ?finalize:(unit -> unit) -> ?ncores:i
 
 (** {6 Parallel map on arrays, indexed} *)
 
-val array_parmapi : ?init:(unit -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> (int -> 'a -> 'b) -> 'a array -> 'b array
+val array_parmapi : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> (int -> 'a -> 'b) -> 'a array -> 'b array
   (** Like array_parmap, but the map function gets as an extra argument
       the index of the mapped element *)
 
@@ -140,7 +140,7 @@ val init_shared_buffer : float array -> buf
   (** [init_shared_buffer a] creates a new memory mapped shared buffer big enough to hold a float array of the size of [a].
       This buffer can be reused in a series of calls to [array_float_parmap], avoiding the cost of reallocating it each time. *)
 
-val array_float_parmap : ?init:(unit -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ?result: float array -> ?sharedbuffer: buf -> ('a -> float) -> 'a array -> float array
+val array_float_parmap : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ?result: float array -> ?sharedbuffer: buf -> ('a -> float) -> 'a array -> float array
   (** [array_float_parmap  ~ncores:n f a ] computes [Array.map f a] by forking 
       [n] processes on a multicore machine, and preallocating the resulting
       array as shared memory, which allows significantly more efficient
@@ -164,7 +164,7 @@ val array_float_parmap : ?init:(unit -> unit) -> ?finalize:(unit -> unit) -> ?nc
 
 (** {6 Parallel map on float arrays, indexed } *)
 
-val array_float_parmapi : ?init:(unit -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ?result: float array -> ?sharedbuffer: buf -> (int -> 'a -> float) -> 'a array -> float array
+val array_float_parmapi : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ?result: float array -> ?sharedbuffer: buf -> (int -> 'a -> float) -> 'a array -> float array
 
   (** Like array_float_parmap, but the map function gets as an extra argument
       the index of the mapped element *)
