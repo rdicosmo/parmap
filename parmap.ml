@@ -121,7 +121,7 @@ let marshal fd v =
 
 (* a simple mapper function that computes 1/nth of the data on each of the n
    cores in one iteration *)
-let simplemapper ncores compute opid al collect =
+let simplemapper (init:int -> unit) (finalize: unit -> unit) ncores compute opid al collect =
   (* flush everything *)
   flush_all();
   (* init task parameters *)
@@ -239,7 +239,7 @@ let setup_children_chans oc pipedown ?fdarr i =
   receive, signal, return, finish, pid
 
 (* parametric mapper primitive that captures the parallel structure *)
-let mapper ncores ~chunksize compute opid al collect =
+let mapper (init:int -> unit) (finalize:unit -> unit) ncores ~chunksize compute opid al collect =
   let ln = Array.length al in
   if ln=0 then (collect []) else
   begin
@@ -514,7 +514,7 @@ let parmapi
 	| n ->  aux ((f' n)::acc) (n-1)
     in aux previous (hi-lo)
   in
-  mapper ncores ~chunksize compute [] al  (fun r -> Utils.concat_tr r)
+  mapper init finalize ncores ~chunksize compute [] al  (fun r -> Utils.concat_tr r)
 
 let parmap ?init ?finalize ?ncores ?chunksize (f:'a -> 'b) (s:'a sequence) : 'b list=
     parmapi ?init ?finalize ?ncores ?chunksize (fun _ x -> f x) s
@@ -557,7 +557,7 @@ let array_parmapi
       Array.concat [(mapi_range lo hi f a);previous]
     with e -> exc_handler e lo
   in
-  mapper ncores ~chunksize compute [||] al  (fun r -> Array.concat r)
+  mapper init finalize ncores ~chunksize compute [||] al  (fun r -> Array.concat r)
 
 let array_parmap ?init ?finalize ?ncores ?chunksize (f:'a -> 'b) (al:'a array) : 'b array=
   array_parmapi ?init ?finalize ?ncores ?chunksize (fun _ x -> f x) al
@@ -637,7 +637,7 @@ let array_float_parmapi
        done
      with e -> exc_handler e lo
    in
-   mapper ncores ~chunksize compute () al (fun r -> ());
+   mapper init finalize ncores ~chunksize compute () al (fun r -> ());
    let res =
      match result with
        None -> Bytearray.to_floatarray barr_out size
