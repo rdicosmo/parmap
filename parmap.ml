@@ -35,6 +35,11 @@ let default_ncores=ref (max 2 (Setcore.numcores()-1));;
 let set_default_ncores n = default_ncores := n;;
 let get_default_ncores () = !default_ncores;;
 
+(* exception handling code *)
+
+let handle_exc core msg =
+  Utils.log_error "aborting due to exception on core %d: %s" core msg; exit 1;;
+
 (* try to create the common directory used for stdin/stdout redirection *)
 let log_dir = ref (Printf.sprintf "/tmp/.parmap.%d" (Unix.getpid ()))
 
@@ -322,10 +327,7 @@ let mapper ncores ~chunksize compute opid al collect =
              (log_debug "sending task %d to worker %d" i w;
               let oc = ocs.(w) in
               (Marshal.to_channel oc (Task i) []); flush oc)
-         | Error (core,msg) ->
-             (Utils.log_error
-                "aborting due to exception on core %d: %s" core msg;
-              exit 1)
+         | Error (core,msg) -> handle_exc core msg
        done;
 
        (* send termination token to all children *)
@@ -432,10 +434,7 @@ let geniter ncores ~chunksize compute al =
  	    (log_debug "sending task %d to worker %d" i w;
  	     let oc = ocs.(w) in
  	     (Marshal.to_channel oc (Task i) []); flush oc)
- 	| Error (core,msg) ->
-            (Utils.log_error
-               "aborting due to exception on core %d: %s" core msg;
-             exit 1)
+ 	| Error (core,msg) -> handle_exc core msg
        done;
 
        (* send termination token to all children *)
@@ -456,6 +455,8 @@ let geniter ncores ~chunksize compute al =
 (* the parallel mapfold function *)
 
 let parmapifold
+    ?(init = fun () -> ())
+    ?(finalize = fun () -> ())
     ?(ncores= !default_ncores)
     ?(chunksize)
     (f:int -> 'a -> 'b)
@@ -479,6 +480,8 @@ let parmapifold
     ncores ~chunksize compute opid al (fun r -> Utils.fold_right concat r opid)
 
 let parmapfold
+    ?(init = fun () -> ())
+    ?(finalize = fun () -> ())
     ?ncores
     ?(chunksize)
     (f:'a -> 'b)
@@ -491,6 +494,8 @@ let parmapfold
 (* the parallel map function *)
 
 let parmapi
+    ?(init = fun () -> ())
+    ?(finalize = fun () -> ())
     ?(ncores= !default_ncores)
     ?chunksize
     (f:int ->'a -> 'b)
@@ -511,12 +516,14 @@ let parmapi
   in
   mapper ncores ~chunksize compute [] al  (fun r -> Utils.concat_tr r)
 
-let parmap ?ncores ?chunksize (f:'a -> 'b) (s:'a sequence) : 'b list=
-    parmapi ?ncores ?chunksize (fun _ x -> f x) s
+let parmap ?init ?finalize ?ncores ?chunksize (f:'a -> 'b) (s:'a sequence) : 'b list=
+    parmapi ?init ?finalize ?ncores ?chunksize (fun _ x -> f x) s
 
 (* the parallel fold function *)
 
 let parfold
+    ?(init = fun () -> ())
+    ?(finalize = fun () -> ())
     ?(ncores= !default_ncores)
     ?chunksize
     (op:'a -> 'b -> 'b)
@@ -539,6 +546,8 @@ let mapi_range lo hi (f:int -> 'a -> 'b) a =
   end
 
 let array_parmapi
+    ?(init = fun () -> ())
+    ?(finalize = fun () -> ())
     ?(ncores= !default_ncores)
     ?chunksize
     (f:int -> 'a -> 'b)
@@ -550,8 +559,8 @@ let array_parmapi
   in
   mapper ncores ~chunksize compute [||] al  (fun r -> Array.concat r)
 
-let array_parmap ?ncores ?chunksize (f:'a -> 'b) (al:'a array) : 'b array=
-  array_parmapi ?ncores ?chunksize (fun _ x -> f x) al
+let array_parmap ?init ?finalize ?ncores ?chunksize (f:'a -> 'b) (al:'a array) : 'b array=
+  array_parmapi ?init ?finalize ?ncores ?chunksize (fun _ x -> f x) al
 
 (* This code is highly optimised for operations on float arrays:
 
@@ -594,6 +603,8 @@ let init_shared_buffer a =
   Unix.close fd; (arr,size)
 
 let array_float_parmapi
+    ?(init = fun () -> ())
+    ?(finalize = fun () -> ())
     ?(ncores= !default_ncores)
     ?chunksize
     ?result
@@ -642,6 +653,8 @@ let array_float_parmapi
   end
 
 let array_float_parmap
+    ?(init = fun () -> ())
+    ?(finalize = fun () -> ())
     ?ncores
     ?chunksize
     ?result
@@ -654,6 +667,8 @@ let array_float_parmap
 (* the parallel iteration function *)
 
 let pariteri
+    ?(init = fun () -> ())
+    ?(finalize = fun () -> ())
     ?(ncores= !default_ncores)
     ?chunksize
     (f:int -> 'a -> unit)
@@ -671,5 +686,5 @@ let pariteri
   in
   geniter ncores ~chunksize compute al
 
-let pariter ?ncores ?chunksize (f:'a -> unit) (s:'a sequence) : unit=
-  pariteri ?ncores ?chunksize (fun _ x -> f x) s
+let pariter ?init ?finalize ?ncores ?chunksize (f:'a -> unit) (s:'a sequence) : unit=
+  pariteri ?init ?finalize ?ncores ?chunksize (fun _ x -> f x) s
