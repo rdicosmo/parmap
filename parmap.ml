@@ -140,6 +140,7 @@ let simplemapper (init:int -> unit) (finalize: unit -> unit) ncores compute opid
     match Unix.fork() with
       0 ->
 	begin
+	  init i;  (* call initialization function *)
           redirect i; (* redirect stdout/stderr *)
           let lo=i*chunksize in
           let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
@@ -148,10 +149,12 @@ let simplemapper (init:int -> unit) (finalize: unit -> unit) ncores compute opid
               "error at index j=%d in (%d,%d), chunksize=%d of a total of \
                %d got exception %s on core %d \n%!"
 	      j lo hi chunksize (hi-lo+1) (Printexc.to_string e) i;
+	    finalize(); (* call finalization function *)
 	    exit 1
           in
 	  let v = compute al lo hi opid exc_handler in
           marshal fdarr.(i) v;
+	  finalize(); (* call finalization function *)
           exit 0
 	end
     | -1  -> Utils.log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
@@ -190,7 +193,7 @@ let simpleiter init finalize ncores compute al =
     match Unix.fork() with
       0 ->
 	begin
-          redirect i; (* redirect stdout/stderr *)
+          init i;  (* call initialization function *)
           let lo=i*chunksize in
           let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
           let exc_handler e j = (* handle an exception at index j *)
@@ -198,9 +201,11 @@ let simpleiter init finalize ncores compute al =
               "error at index j=%d in (%d,%d), chunksize=%d of a total of \
                %d got exception %s on core %d \n%!"
 	      j lo hi chunksize (hi-lo+1) (Printexc.to_string e) i;
+	    finalize(); (* call finalization function *)
 	    exit 1
           in
 	  compute al lo hi exc_handler;
+	  finalize(); (* call finalization function *)
           exit 0
 	end
     | -1  -> Utils.log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
@@ -235,7 +240,9 @@ let setup_children_chans oc pipedown finalize ?fdarr i =
   let finish () =
     (log_debug "shutting down (pid=%d)\n%!" pid;
      try close_in ic; close_out oc with _ -> ()
-    ); exit 0 in
+    ); 
+    finalize(); (* call finalization function *)
+    exit 0 in
   receive, signal, return, finish, pid
 
 (* parametric mapper primitive that captures the parallel structure *)
@@ -298,6 +305,7 @@ let mapper (init:int -> unit) (finalize:unit -> unit) ncores ~chunksize compute 
                    length %d, chunksize=%d finished in %f seconds"
          	  i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
                in
+               init i;   (* call initialization function *)
                while true do
          	(* ask for work until we are finished *)
          	signal (Ready i);
@@ -406,6 +414,7 @@ let geniter init finalize ncores ~chunksize compute al =
                    of length %d, chunksize=%d finished in %f seconds"
  		  i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
  	      in
+              init i;  (* call initialization function *)
  	      while true do
  		(* ask for work until we are finished *)
  		signal (Ready i);
