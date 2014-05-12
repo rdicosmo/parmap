@@ -464,7 +464,7 @@ let geniter init finalize ncores ~chunksize compute al =
 (* the parallel mapfold function *)
 
 let parmapifold
-    ?(init = redirect)
+    ?(init = fun _ -> ())
     ?(finalize = fun () -> ())
     ?(ncores= !default_ncores)
     ?(chunksize)
@@ -489,7 +489,7 @@ let parmapifold
     init finalize ncores ~chunksize compute opid al (fun r -> Utils.fold_right concat r opid)
 
 let parmapfold
-    ?(init = redirect)
+    ?(init = fun _ -> ())
     ?(finalize = fun () -> ())
     ?ncores
     ?(chunksize)
@@ -503,7 +503,7 @@ let parmapfold
 (* the parallel map function *)
 
 let parmapi
-    ?(init = redirect)
+    ?(init = fun _ -> ())
     ?(finalize = fun () -> ())
     ?(ncores= !default_ncores)
     ?chunksize
@@ -531,7 +531,7 @@ let parmap ?init ?finalize ?ncores ?chunksize (f:'a -> 'b) (s:'a sequence) : 'b 
 (* the parallel fold function *)
 
 let parfold
-    ?(init = redirect)
+    ?(init = fun _ -> ())
     ?(finalize = fun () -> ())
     ?(ncores= !default_ncores)
     ?chunksize
@@ -555,7 +555,7 @@ let mapi_range lo hi (f:int -> 'a -> 'b) a =
   end
 
 let array_parmapi
-    ?(init = redirect)
+    ?(init = fun _ -> ())
     ?(finalize = fun () -> ())
     ?(ncores= !default_ncores)
     ?chunksize
@@ -612,7 +612,7 @@ let init_shared_buffer a =
   Unix.close fd; (arr,size)
 
 let array_float_parmapi
-    ?(init = redirect)
+    ?(init = fun _ -> ())
     ?(finalize = fun () -> ())
     ?(ncores= !default_ncores)
     ?chunksize
@@ -662,7 +662,7 @@ let array_float_parmapi
   end
 
 let array_float_parmap
-    ?(init = redirect)
+    ?(init = fun _ -> ())
     ?(finalize = fun () -> ())
     ?ncores
     ?chunksize
@@ -676,7 +676,7 @@ let array_float_parmap
 (* the parallel iteration function *)
 
 let pariteri
-    ?(init = redirect)
+    ?(init = fun _ -> ())
     ?(finalize = fun () -> ())
     ?(ncores= !default_ncores)
     ?chunksize
