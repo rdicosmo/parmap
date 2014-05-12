@@ -20,13 +20,8 @@ type 'a sequence = L of 'a list | A of 'a array
 
 let debug_enabled = ref false
 
-let redirect_requested = ref false
-
 (* toggle debugging *)
 let debugging b = debug_enabled:=b
-
-(* toggle redirection *)
-let redirecting b = redirect_requested:=b
 
 (* default number of cores, and a setter function *)
 
@@ -40,17 +35,16 @@ let get_default_ncores () = !default_ncores;;
 let handle_exc core msg =
   Utils.log_error "aborting due to exception on core %d: %s" core msg; exit 1;;
 
-(* try to create the common directory used for stdin/stdout redirection *)
-let log_dir = ref (Printf.sprintf "/tmp/.parmap.%d" (Unix.getpid ()))
+(* Helper functions for stdout/stderr redirection *)
 
-let can_redirect () =
-  if not(Sys.file_exists !log_dir) then
+let can_redirect path =
+  if not(Sys.file_exists path) then
     try
-      Unix.mkdir !log_dir 0o777; true
+      Unix.mkdir path 0o777; true
     with Unix.Unix_error(e,s,s') ->
       (Printf.eprintf "[Pid %d]: Error creating %s : %s; proceeding without \
                        stdout/stderr redirection\n%!"
-	 (Unix.getpid ()) !log_dir (Unix.error_message e));
+	 (Unix.getpid ()) path (Unix.error_message e));
       false
   else true
 
@@ -62,11 +56,11 @@ let log_debug fmt =
   ) fmt
 
 (* freopen emulation, from Xavier's suggestion on OCaml mailing list *)
-let reopen_out outchan fname =
-  if !redirect_requested && can_redirect() then
+let reopen_out outchan path fname =
+  if can_redirect path then
     begin
       flush outchan;
-      let filename = Filename.concat !log_dir fname in
+      let filename = Filename.concat path fname in
       let fd1 = Unix.descr_of_out_channel outchan in
       let fd2 = Unix.openfile
                   filename [Unix.O_WRONLY; Unix.O_CREAT; Unix.O_TRUNC] 0o666 in
@@ -77,9 +71,9 @@ let reopen_out outchan fname =
 
 (* send stdout and stderr to a file to avoid mixing output from different
    cores, if enabled *)
-let redirect i =
-      reopen_out stdout (Printf.sprintf "stdout.%d" i);
-      reopen_out stderr (Printf.sprintf "stderr.%d" i);;
+let redirect ?(path = (Printf.sprintf "/tmp/.parmap.%d" (Unix.getpid ()))) ~id =
+      reopen_out stdout path (Printf.sprintf "stdout.%d" id);
+      reopen_out stderr path (Printf.sprintf "stderr.%d" id);;
 
 (* unmarshal from a mmap seen as a bigarray *)
 let unmarshal fd =
@@ -141,7 +135,6 @@ let simplemapper (init:int -> unit) (finalize: unit -> unit) ncores compute opid
       0 ->
 	begin
 	  init i;  (* call initialization function *)
-          redirect i; (* redirect stdout/stderr *)
           let lo=i*chunksize in
           let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
           let exc_handler e j = (* handle an exception at index j *)
@@ -226,7 +219,6 @@ type msg_to_worker = Finished | Task of int
 
 let setup_children_chans oc pipedown finalize ?fdarr i =
   Setcore.setcore i;
-  redirect i;
   (* close the other ends of the pipe and convert my ends to ic/oc *)
   Unix.close (snd pipedown.(i));
   let pid = Unix.getpid() in

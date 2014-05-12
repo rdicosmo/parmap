@@ -175,11 +175,16 @@ val debugging : bool -> unit
 
   (** Enable or disable debugging code in the library; default: false *)
 
-(** {6 Redirection of stdout and stderr} *)
+(** {6 Helper function for redirection of stdout and stderr} *)
 
-val redirecting : bool -> unit
+val redirect : ?path:string -> id:int -> unit
 
-  (** Enable or disable the redirection of the stdout and stderr. 
-      If enabled, the stdin and stdout in the workers will be redirected to
-      files located in the temporary directory /tmp, carrying names of the shape 
-      .parmap.XXXXX; default: false *)
+  (** Helper function that redirects stdout and stderr to files 
+      located in the directory [path], carrying names of the shape 
+      stdout.NNN and stderr.NNN where NNN is the [id] of the used core.
+      Useful when writing initialisation functions to be passed as
+      [init] argument to the parallel combinators.
+      The default value for [path] is /tmp/.parmap.PPPP with PPPP the
+      process id of the main program.
+   *)
+
