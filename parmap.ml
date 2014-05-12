@@ -35,6 +35,11 @@ let default_ncores=ref (max 2 (Setcore.numcores()-1));;
 let set_default_ncores n = default_ncores := n;;
 let get_default_ncores () = !default_ncores;;
 
+(* exception handling code *)
+
+let handle_exc core msg =
+  Utils.log_error "aborting due to exception on core %d: %s" core msg; exit 1;;
+
 (* try to create the common directory used for stdin/stdout redirection *)
 let log_dir = ref (Printf.sprintf "/tmp/.parmap.%d" (Unix.getpid ()))
 
@@ -322,10 +327,7 @@ let mapper ncores ~chunksize compute opid al collect =
              (log_debug "sending task %d to worker %d" i w;
               let oc = ocs.(w) in
               (Marshal.to_channel oc (Task i) []); flush oc)
-         | Error (core,msg) ->
-             (Utils.log_error
-                "aborting due to exception on core %d: %s" core msg;
-              exit 1)
+         | Error (core,msg) -> handle_exc core msg
        done;
 
        (* send termination token to all children *)
@@ -432,10 +434,7 @@ let geniter ncores ~chunksize compute al =
  	    (log_debug "sending task %d to worker %d" i w;
  	     let oc = ocs.(w) in
  	     (Marshal.to_channel oc (Task i) []); flush oc)
- 	| Error (core,msg) ->
-            (Utils.log_error
-               "aborting due to exception on core %d: %s" core msg;
-             exit 1)
+ 	| Error (core,msg) -> handle_exc core msg
        done;
 
        (* send termination token to all children *)
