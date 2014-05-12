@@ -477,7 +477,7 @@ let parmapifold
     done; !r
   in
   mapper
-    ncores ~chunksize compute opid al (fun r -> Utils.fold_right concat r opid)
+    init finalize ncores ~chunksize compute opid al (fun r -> Utils.fold_right concat r opid)
 
 let parmapfold
     ?(init = fun () -> ())
