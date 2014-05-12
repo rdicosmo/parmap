@@ -12,7 +12,7 @@
 
 open Parmap
 
-let scale_test ?(inorder=true) ?(step=1) ?chunksize compute sequence iter nprocmin nprocmax =
+let scale_test ?(init=(fun _ -> ())) ?(inorder=true) ?(step=1) ?chunksize compute sequence iter nprocmin nprocmax =
   Printf.eprintf "Testing scalability with %d iterations on %d to %d cores, step %d\n%!" iter nprocmin nprocmax step;
   let rseq,tseq =  
     let d=Unix.gettimeofday() in
@@ -26,7 +26,7 @@ let scale_test ?(inorder=true) ?(step=1) ?chunksize compute sequence iter nprocm
     let tot=ref 0.0 in
     for j=1 to iter do
       let d=Unix.gettimeofday() in
-      let rpar=parmap ~ncores:i ?chunksize compute sequence in
+      let rpar=parmap ~init ~ncores:i ?chunksize compute sequence in
       tot:=!tot+.(Unix.gettimeofday()-.d);
       if rseq<>rpar then 
 	begin
@@ -43,7 +43,7 @@ let scale_test ?(inorder=true) ?(step=1) ?chunksize compute sequence iter nprocm
   rseq
 ;;
 
-let array_scale_test ?(inorder=true) ?(step=1) ?chunksize compute a iter nprocmin nprocmax =
+let array_scale_test ?(init= (fun _ -> ())) ?(inorder=true) ?(step=1) ?chunksize compute a iter nprocmin nprocmax =
   Printf.eprintf "Testing scalability with %d iterations on %d to %d cores, step %d\n" iter nprocmin nprocmax step;
   let rseq,tseq =  
     let d=Unix.gettimeofday() in
@@ -56,7 +56,7 @@ let array_scale_test ?(inorder=true) ?(step=1) ?chunksize compute a iter nprocmi
     let tot=ref 0.0 in
     for j=1 to iter do
       let d=Unix.gettimeofday() in
-      let rpar=array_parmap ~ncores:i compute a in
+      let rpar=array_parmap ~init ~ncores:i compute a in
       tot:=!tot+.(Unix.gettimeofday()-.d);
       if rseq<>rpar then 
 	begin
@@ -73,7 +73,7 @@ let array_scale_test ?(inorder=true) ?(step=1) ?chunksize compute a iter nprocmi
   rseq
 ;;
 
-let array_float_scale_test ?(inorder=true) ?(step=1) ?chunksize compute a iter nprocmin nprocmax =
+let array_float_scale_test ?(init= (fun _ -> ())) ?(inorder=true) ?(step=1) ?chunksize compute a iter nprocmin nprocmax =
   Printf.eprintf "Testing scalability with %d iterations on %d to %d cores, step %d\n" iter nprocmin nprocmax step;
   let rseq,tseq =  
     let d=Unix.gettimeofday() in
@@ -86,7 +86,7 @@ let array_float_scale_test ?(inorder=true) ?(step=1) ?chunksize compute a iter n
     let tot=ref 0.0 in
     for j=1 to iter do
       let d=Unix.gettimeofday() in
-      let rpar=array_float_parmap ~ncores:i compute a in
+      let rpar=array_float_parmap ~init ~ncores:i compute a in
       tot:=!tot+.(Unix.gettimeofday()-.d);
       if rseq<>rpar then 
 	begin
