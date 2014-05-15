@@ -8,14 +8,21 @@ LDFLAGS=@LDFLAGS@
 OCAMLFIND=@OCAMLFIND@
 OCAMLBUILD=@OCAMLBUILD@
 
-prefix=@prefix@
-exec_prefix=@exec_prefix@
-LIBDIR=$(DESTDIR)@libdir@/ocaml
-BINDIR=$(DESTDIR)@bindir@
-MANDIR=$(DESTDIR)@mandir@
+ifeq ($(DESTDIR),)
+LIBDIR=$(shell ocamlfind printconf destdir)
+BINDIR=@bindir@
+MANDIR=@mandir@
+INSTALL = $(OCAMLFIND) install
+UNINSTALL = $(OCAMLFIND) remove
+else
+export OCAMLLIBDIR := lib/ocaml
+LIBDIR=$(DESTDIR)/$(OCAMLLIBDIR)
+BINDIR=$(DESTDIR)/bin
+MANDIR=$(DESTDIR)/man
+INSTALL = $(OCAMLFIND) install -destdir $(LIBDIR)
+UNINSTALL = $(OCAMLFIND) remove -destdir $(LIBDIR)
+endif
 
-INSTALL=$(OCAMLFIND) install -destdir $(LIBDIR)
-UNINSTALL=$(OCAMLFIND) remove -destdir $(LIBDIR)
 
 ifeq ("@OCAMLBEST@","opt")
   OCAMLBEST=native
