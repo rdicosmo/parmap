@@ -40,6 +40,14 @@ type 'a sequence = L of 'a list | A of 'a array;;
     If you want to perform a parallel map operation on an array, use [array_parmap] or [array_float_parmap] instead.
     *)
 
+(** {6 Optional init and finalize functions} *)
+
+(** The optional [init] (resp. [finalize]) function is called once by each child process just after creation
+    (resp. just before exit).
+    [init] and [finalize] both default to doing nothing.
+    [init i] takes the child rank [i] as parameter (first forked child has rank 0, next 1, etc.).
+*)
+
 (** {6 Parallel mapfold} *)
 
 val parmapfold : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a sequence -> ('b-> 'c -> 'c) -> 'c -> ('c->'c->'c) -> 'c
