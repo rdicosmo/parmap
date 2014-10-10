@@ -489,7 +489,7 @@ let parmapfold
     (op:'b->'c->'c)
     (opid:'c)
     (concat:'c->'c->'c) : 'c=
-  parmapifold ?ncores ?chunksize (fun _ x -> f x) s op opid concat
+  parmapifold ~init ~finalize ?ncores ?chunksize (fun _ x -> f x) s op opid concat
 
 (* the parallel map function *)
 
@@ -530,7 +530,7 @@ let parfold
     (s:'a sequence)
     (opid:'b)
     (concat:'b->'b->'b) : 'b=
-    parmapfold ~ncores ?chunksize (fun x -> x) s op opid concat
+    parmapfold ~init ~finalize ~ncores ?chunksize (fun x -> x) s op opid concat
 
 (* the parallel map function, on arrays *)
 
@@ -662,7 +662,7 @@ let array_float_parmap
     (f:'a -> float)
     (al:'a array) : float array =
   array_float_parmapi
-    ?ncores ?chunksize ?result ?sharedbuffer (fun _ x -> f x) al
+    ~init ~finalize ?ncores ?chunksize ?result ?sharedbuffer (fun _ x -> f x) al
 
 (* the parallel iteration function *)
 
