@@ -6,3 +6,4 @@
 
 
 <*sdl.*>: package(bigarray), package(sdl)
+<*.{ml,mli}>: warn(Ae)
