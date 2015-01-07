@@ -41,7 +41,7 @@ let can_redirect path =
   if not(Sys.file_exists path) then
     try
       Unix.mkdir path 0o777; true
-    with Unix.Unix_error(e,s,s') ->
+    with Unix.Unix_error(e,_s,_s') ->
       (Printf.eprintf "[Pid %d]: Error creating %s : %s; proceeding without \
                        stdout/stderr redirection\n%!"
 	 (Unix.getpid ()) path (Unix.error_message e));
@@ -150,10 +150,10 @@ let simplemapper (init:int -> unit) (finalize: unit -> unit) ncores compute opid
           exit 0
 	end
     | -1  -> Utils.log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
-    | pid -> ()
+    | _pid -> ()
   done;
   (* wait for all children *)
-  for i = 0 to ncores-1 do
+  for _i = 0 to ncores-1 do
     try ignore(Unix.wait())
     with Unix.Unix_error (Unix.ECHILD, _, _) -> ()
   done;
@@ -200,10 +200,10 @@ let simpleiter init finalize ncores compute al =
           exit 0
 	end
     | -1  -> Utils.log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
-    | pid -> ()
+    | _pid -> ()
   done;
   (* wait for all children *)
-  for i = 0 to ncores-1 do
+  for _i = 0 to ncores-1 do
     try ignore(Unix.wait())
     with Unix.Unix_error (Unix.ECHILD, _, _) -> ()
   done
@@ -215,7 +215,7 @@ let simpleiter init finalize ncores compute al =
 type msg_to_master = Ready of int | Error of int * string
 type msg_to_worker = Finished | Task of int
 
-let setup_children_chans oc pipedown finalize ?fdarr i =
+let setup_children_chans oc pipedown ?fdarr i =
   Setcore.setcore i;
   (* close the other ends of the pipe and convert my ends to ic/oc *)
   Unix.close (snd pipedown.(i));
@@ -274,7 +274,7 @@ let mapper (init:int -> unit) (finalize:unit -> unit) ncores ~chunksize compute 
                (* primitives for communication *)
                Unix.close pipeup_rd;
                let receive,signal,return,finish,pid =
-                 setup_children_chans oc_up pipedown finalize ~fdarr i in
+                 setup_children_chans oc_up pipedown ~fdarr i in
                let reschunk=ref opid in
                let computetask n = (* compute chunk number n *)
          	let lo=n*chunksize in
@@ -305,7 +305,7 @@ let mapper (init:int -> unit) (finalize:unit -> unit) ncores ~chunksize compute 
                done;
              end
          | -1  -> Utils.log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
-         | pid -> ()
+         | _pid -> ()
        done;
 
        (* close unused ends of the pipes *)
@@ -336,7 +336,7 @@ let mapper (init:int -> unit) (finalize:unit -> unit) ncores ~chunksize compute 
        ) ocs;
 
        (* wait for all children to terminate *)
-       for i = 0 to ncores-1 do
+       for _i = 0 to ncores-1 do
          try ignore(Unix.wait())
          with Unix.Unix_error (Unix.ECHILD, _, _) -> ()
        done;
@@ -385,7 +385,7 @@ let geniter init finalize ncores ~chunksize compute al =
                (* primitives for communication *)
                Unix.close pipeup_rd;
                let receive,signal,return,finish,pid =
-                 setup_children_chans oc_up pipedown finalize i in
+                 setup_children_chans oc_up pipedown i in
                let computetask n = (* compute chunk number n *)
  		let lo=n*chunksize in
  		let hi=if n=ntasks-1 then ln-1 else (n+1)*chunksize-1 in
@@ -415,7 +415,7 @@ let geniter init finalize ncores ~chunksize compute al =
  	      done;
  	    end
  	| -1  -> Utils.log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
- 	| pid -> ()
+ 	| _pid -> ()
        done;
 
        (* close unused ends of the pipes *)
@@ -445,7 +445,7 @@ let geniter init finalize ncores ~chunksize compute al =
        ) ocs;
 
        (* wait for all children to terminate *)
-       for i = 0 to ncores-1 do
+       for _i = 0 to ncores-1 do
  	try ignore(Unix.wait())
  	with Unix.Unix_error (Unix.ECHILD, _, _) -> ()
        done
@@ -637,7 +637,7 @@ let array_float_parmapi
        done
      with e -> exc_handler e lo
    in
-   mapper init finalize ncores ~chunksize compute () al (fun r -> ());
+   mapper init finalize ncores ~chunksize compute () al (fun _r -> ());
    let res =
      match result with
        None -> Bytearray.to_floatarray barr_out size
