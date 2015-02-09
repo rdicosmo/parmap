@@ -40,6 +40,7 @@ CAMLprim value setcore(value which) {
 	fprintf(stderr,"Failed pinning to cpu %d, trying %d/2\n",w, w); 
 	w=w/2;
       }
+      else
 #endif
 #if HAVE_MACH_THREAD_POLICY_H
       affinityData.affinity_tag = w;
@@ -51,8 +52,8 @@ CAMLprim value setcore(value which) {
         fprintf(stderr,"MAC OS X: Failed pinning to cpu %d, trying %d/2\n",w, w);
         w=w/2;
       }
-#endif
       else 
+#endif
 	{ //fprintf(stderr,"Succeeded pinning to cpu %d\n",w); 
 	  finished=1;
 	}
