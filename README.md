@@ -113,7 +113,7 @@ function must perform.
 All implementations need to do 1, 2 and 4; steps 3 and/or 5 may be omitted depending on
 what the user wants to do with the result.
 
-The `array_float_parmap` performs steps 1,2,4 and 5. It is possible to share steps
+The `array_float_parmap` performs steps 1, 2, 4 and 5. It is possible to share steps
 1 and 2 among subsequent calls to the parallel function by preallocating the result
 array and the shared memory buffer, and passing them as optional parameters to the
 `array_float_parmap` function: this may save a significant amount of time if the
