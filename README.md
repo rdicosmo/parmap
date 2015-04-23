@@ -65,12 +65,12 @@ need to load the .cmxs modules in it; an example is given in example/topnat.ml
 If the number of chunks is equal to the number of cores, it is easy to preserve
 the order of the elements of the sequence passed to the map/fold operations, so
 the result will be a list with the same order as if the sequential function would
-be applied to the input. This is what the parmap, parmafold and parfold functions
+be applied to the input. This is what the `parmap`, `parmafold` and `parfold` functions
 do when the chunksize argument is not used.
 
 If the user specifies a chunksize that is different from the number of cores,
 there is no general way to preserve the ordering, so the result of calling
-Parmap.parmap f l are not necessarily in the same order as List.map f l.
+`Parmap.parmap f l` are not necessarily in the same order as `List.map f l`.
 
 In general, using little chunksize helps in balancing the load among the workers,
 and provides better speed, at the price of losing the ordering: there is a
@@ -83,9 +83,9 @@ to and from a list is expensive, on large data structures, so we provide a speci
 version of map on arrays, that beaves exactly like parmap.
 
 We also provide a highly optimised specialised parmap version that is targeted
-to float arrays, array_float_parmap, that allows you to perform parallel
+to float arrays, `array_float_parmap`, that allows you to perform parallel
 computation on very large float arrays efficiently, without the boxing/unboxing
-overhead introduced by the other primitives, including array_parmap.
+overhead introduced by the other primitives, including `array_parmap`.
 
 To understand the efficiency issues involved in the case of large arrays of float,
 here is a short summary of the steps that any implementation of a parallel map
@@ -94,7 +94,6 @@ function must perform.
   1. create a float array to hold the result of the computation.
      This operation is expensive: on an Intel i7, creating a 10M float array
      takes 50 milliseconds
-
 ```ocaml
      ocamlnat
           Objective Caml version 3.12.0 - native toplevel
@@ -103,7 +102,6 @@ function must perform.
      # let d = Unix.gettimeofday() in ignore(Array.create 10000000 0.); Unix.gettimeofday() -. d;;
      - : float = 0.0501301288604736328
 ```
-
   2. create a shared memory area 
 
   3. possibly copy the result array to the shared memory area
