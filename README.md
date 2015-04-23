@@ -25,8 +25,8 @@ the 1/n of the data, in chunks  of a size you  can choose, returning the results
 through a shared memory area to the  parent process, that resumes execution once
 all the children have terminated, and the data has been recollected.
 
-You need  to run your  program on a single multicore  machine;  repeat after me:
-Parmap  is   not meant to   run  on a cluster,  see   one of the  many available
+You *need*  to run your  program *on a single multicore  machine*;  repeat after me:
+`Parmap`  _is   not meant_ to   run  on a cluster,  see   one of the  many available
 (re)implementations of the map-reduce schema for that.
 
 By forking the parent process  on a sigle  machine, the children get access, for
