@@ -7,7 +7,7 @@ accelerate an   operation  which  happens   to be   a  map,  fold    or map/fold
 place  of the standard   `List.map`   and friends,  and  specify  the  number   of
 subprocesses to use by the optional parameter `~ncores`.
 
-See the example directory for a couple of running programs.
+See the `example` directory for a couple of running programs.
 
 ## DO'S and DONT'S
 
@@ -58,7 +58,7 @@ just make sure that you use autoconf properly.
 
 You can use Parmap in a native toplevel  (it may be quite useful  if you use the
 native toplevel to perform fast interactive computations), but remember that you
-need to load the .cmxs modules in it; an example is given in example/topnat.ml
+need to load the `.cmxs` modules in it; an example is given in `example/topnat.ml`
 
 ## Preservation of output order in Parmap
 
