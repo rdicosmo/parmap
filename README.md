@@ -91,24 +91,24 @@ To understand the efficiency issues involved in the case of large arrays of floa
 here is a short summary of the steps that any implementation of a parallel map
 function must perform.
 
-  1. create a float array to hold the result of the computation.
-     This operation is expensive: on an Intel i7, creating a 10M float array
-     takes 50 milliseconds
-```ocaml
-     ocamlnat
-          Objective Caml version 3.12.0 - native toplevel
+ 1. create a float array to hold the result of the computation.
+    This operation is expensive: on an Intel i7, creating a 10M float array
+    takes 50 milliseconds
+    ```ocaml
+        ocamlnat
+             Objective Caml version 3.12.0 - native toplevel
 
-     # #load "unix.cmxs";;
-     # let d = Unix.gettimeofday() in ignore(Array.create 10000000 0.); Unix.gettimeofday() -. d;;
-     - : float = 0.0501301288604736328
-```
-  2. create a shared memory area 
+        # #load "unix.cmxs";;
+        # let d = Unix.gettimeofday() in ignore(Array.create 10000000 0.); Unix.gettimeofday() -. d;;
+        - : float = 0.0501301288604736328
+    ```
+ 2. create a shared memory area 
 
-  3. possibly copy the result array to the shared memory area
+ 3. possibly copy the result array to the shared memory area
 
-  4. perform the computation in the children writing the result in the shared memory area
+ 4. perform the computation in the children writing the result in the shared memory area
 
-  5. possibly copy the result back to the OCaml array
+ 5. possibly copy the result back to the OCaml array
 
 All implementations need to do 1, 2 and 4; steps 3 and/or 5 may be omitted depending on
 what the user wants to do with the result.
