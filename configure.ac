@@ -26,8 +26,8 @@ AC_CHECK_DECLS([thread_policy_set], [], [], [[
 
 AC_CONFIG_HEADERS([config.h])
 
-t=`$OCAMLBUILD -use-ocamlfind &> /dev/null; echo $?`
-if test $t == 0 ; then
+t=`$OCAMLBUILD -use-ocamlfind > /dev/null 2>&1 ; echo $?`
+if test "$t" = 0 ; then
   AC_MSG_RESULT(ocaml version $OCAMLVERSION. Use standard Makefile)
   AC_CONFIG_FILES([Makefile])
   AC_OUTPUT
