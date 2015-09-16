@@ -46,11 +46,10 @@ CMXSLIBS=
 ALIBS=
 
 ifeq ("@OCAMLBEST@","opt")
+  ALIBS = $(BYTELIBS:%.cma=%.a)
   OPTLIBS += $(BYTELIBS:%.cma=%.cmxa)
   CMXSLIBS += $(BYTELIBS:%.cma=%.cmxs)
 endif
-
-ALIBS = $(BYTELIBS:%.cma=%.a)
 
 all:
 	$(OCAMLBUILD) $(OBFLAGS) $(BYTELIBS) $(OPTLIBS) $(CMXSLIBS) $(ALIBS)
@@ -86,7 +85,7 @@ install: $(LIBS) META
 	$(INSTALL) -patch-version $(VERSION) $(NAME) $(INSTALL_STUFF)
 	(cd _build; ocamldoc -man -man-mini parmap.ml parmap.mli)
 	test -d $(MANDIR) || mkdir -p $(MANDIR)
-	cp -a _build/Parmap.3o $(MANDIR)
+	cp -p _build/Parmap.3o $(MANDIR)
 
 uninstall:
 	$(UNINSTALL) $(NAME)
