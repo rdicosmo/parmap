@@ -48,6 +48,9 @@ ALIBS=
 ifeq ("@OCAMLBEST@","opt")
   ALIBS = $(BYTELIBS:%.cma=%.a)
   OPTLIBS += $(BYTELIBS:%.cma=%.cmxa)
+endif
+
+ifeq ("@OCAMLNATDYNLINK@", "yes")
   CMXSLIBS += $(BYTELIBS:%.cma=%.cmxs)
 endif
 
