@@ -8,20 +8,16 @@ LDFLAGS=@LDFLAGS@
 OCAMLFIND=@OCAMLFIND@
 OCAMLBUILD=@OCAMLBUILD@
 
-datarootdir = @datarootdir@
-prefix = @prefix@
-exec_prefix = @exec_prefix@
+PREFIX = @prefix@
 
 ifeq ($(DESTDIR),)
 LIBDIR=$(shell ocamlfind printconf destdir)
-BINDIR=@bindir@
 MANDIR=@mandir@/man3
 INSTALL = $(OCAMLFIND) install
 UNINSTALL = $(OCAMLFIND) remove
 else
 export OCAMLLIBDIR := lib/ocaml
 LIBDIR=$(DESTDIR)/$(OCAMLLIBDIR)
-BINDIR=$(DESTDIR)/bin
 MANDIR=$(DESTDIR)/man/man3
 INSTALL = $(OCAMLFIND) install -destdir $(LIBDIR)
 UNINSTALL = $(OCAMLFIND) remove -destdir $(LIBDIR)
