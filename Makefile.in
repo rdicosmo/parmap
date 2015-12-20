@@ -72,12 +72,12 @@ install: $(LIBS) META
 	mkdir -p $(DESTDIR)$(LIBDIR)/stublibs
 	$(OCAMLFIND) install -destdir $(DESTDIR)$(LIBDIR) -patch-version $(VERSION) $(NAME) $(INSTALL_STUFF)
 	(cd _build; ocamldoc -man -man-mini parmap.ml parmap.mli)
-	mkdir -p $(DESTDIR)$(PREFIX)$(MANDIR)
-	cp -p _build/Parmap.3o $(DESTDIR)$(PREFIX)$(MANDIR)
+	mkdir -p $(DESTDIR)$(MANDIR)
+	cp -p _build/Parmap.3o $(DESTDIR)$(MANDIR)
 
 uninstall:
 	$(OCAMLFIND) remove -destdir $(DESTDIR)$(LIBDIR) $(NAME)
-	rm -f $(DESTDIR)$(PREFIX)$(MANDIR)/Parmap.3o
+	rm -f $(DESTDIR)$(MANDIR)/Parmap.3o
 
 doc:
 	$(OCAMLBUILD) $(OBFLAGS) $(NAME).docdir/index.html $(NAME).docdir/index.dot
