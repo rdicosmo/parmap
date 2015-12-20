@@ -78,11 +78,11 @@ INSTALL_STUFF += $(filter-out $(wildcard _build/myocamlbuild.*),$(wildcard _buil
 INSTALL_STUFF += $(wildcard _build/*.so _build/*.a)
 
 install: $(LIBS) META
-	test -d $(LIBDIR) || mkdir -p $(LIBDIR)
-	test -d $(LIBDIR)/stublibs || mkdir -p $(LIBDIR)/stublibs
+	mkdir -p $(LIBDIR)
+	mkdir -p $(LIBDIR)/stublibs
 	$(INSTALL) -patch-version $(VERSION) $(NAME) $(INSTALL_STUFF)
 	(cd _build; ocamldoc -man -man-mini parmap.ml parmap.mli)
-	test -d $(PREFIX)$(MANDIR) || mkdir -p $(PREFIX)$(MANDIR)
+	mkdir -p $(PREFIX)$(MANDIR)
 	cp -p _build/Parmap.3o $(PREFIX)$(MANDIR)
 
 uninstall:
