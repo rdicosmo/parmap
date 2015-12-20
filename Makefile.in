@@ -9,16 +9,15 @@ OCAMLFIND=@OCAMLFIND@
 OCAMLBUILD=@OCAMLBUILD@
 
 PREFIX = @prefix@
+MANDIR = @mandir@/man3
 
 ifeq ($(DESTDIR),)
 LIBDIR=$(shell ocamlfind printconf destdir)
-MANDIR=@mandir@/man3
 INSTALL = $(OCAMLFIND) install
 UNINSTALL = $(OCAMLFIND) remove
 else
 export OCAMLLIBDIR := lib/ocaml
 LIBDIR=$(DESTDIR)/$(OCAMLLIBDIR)
-MANDIR=$(DESTDIR)/man/man3
 INSTALL = $(OCAMLFIND) install -destdir $(LIBDIR)
 UNINSTALL = $(OCAMLFIND) remove -destdir $(LIBDIR)
 endif
@@ -83,12 +82,12 @@ install: $(LIBS) META
 	test -d $(LIBDIR)/stublibs || mkdir -p $(LIBDIR)/stublibs
 	$(INSTALL) -patch-version $(VERSION) $(NAME) $(INSTALL_STUFF)
 	(cd _build; ocamldoc -man -man-mini parmap.ml parmap.mli)
-	test -d $(MANDIR) || mkdir -p $(MANDIR)
-	cp -p _build/Parmap.3o $(MANDIR)
+	test -d $(PREFIX)$(MANDIR) || mkdir -p $(PREFIX)$(MANDIR)
+	cp -p _build/Parmap.3o $(PREFIX)$(MANDIR)
 
 uninstall:
 	$(UNINSTALL) $(NAME)
-	rm -f $(MANDIR)/Parmap.3o
+	rm -f $(PREFIX)$(MANDIR)/Parmap.3o
 
 doc:
 	$(OCAMLBUILD) $(OBFLAGS) $(NAME).docdir/index.html $(NAME).docdir/index.dot
