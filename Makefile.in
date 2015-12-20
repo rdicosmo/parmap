@@ -10,14 +10,12 @@ OCAMLBUILD=@OCAMLBUILD@
 
 PREFIX = @prefix@
 MANDIR = @mandir@/man3
+LIBDIR = $(shell ocamlfind printconf destdir)
 
 ifeq ($(DESTDIR),)
-LIBDIR=$(shell ocamlfind printconf destdir)
 INSTALL = $(OCAMLFIND) install
 UNINSTALL = $(OCAMLFIND) remove
 else
-export OCAMLLIBDIR := lib/ocaml
-LIBDIR=$(DESTDIR)/$(OCAMLLIBDIR)
 INSTALL = $(OCAMLFIND) install -destdir $(LIBDIR)
 UNINSTALL = $(OCAMLFIND) remove -destdir $(LIBDIR)
 endif
