@@ -286,7 +286,7 @@ let mapper (init:int -> unit) (finalize:unit -> unit) ncores ~chunksize compute 
                       "error at index j=%d in (%d,%d), chunksize=%d of a \
                        total of %d got exception %s on core %d \n%!"
          	      j lo hi chunksize (hi-lo+1) errmsg i;
-         	    signal (Error (i,errmsg));
+         	    signal (Error (i, errmsg): msg_to_master);
                     finish()
          	  end
          	in
@@ -325,7 +325,7 @@ let mapper (init:int -> unit) (finalize:unit -> unit) ncores ~chunksize compute 
              (log_debug "sending task %d to worker %d" i w;
               let oc = ocs.(w) in
               (Marshal.to_channel oc (Task i) []); flush oc)
-         | Error (core,msg) -> handle_exc core msg
+         | (Error (core,msg): msg_to_master) -> handle_exc core msg
        done;
 
        (* send termination token to all children *)
@@ -396,7 +396,7 @@ let geniter init finalize ncores ~chunksize compute al =
                       "error at index j=%d in (%d,%d), chunksize=%d of \
                        a total of %d got exception %s on core %d \n%!"
  		      j lo hi chunksize (hi-lo+1) errmsg i;
- 		    signal (Error (i,errmsg));
+ 		    signal (Error (i,errmsg): msg_to_master);
                     finish()
  		  end
  		in
@@ -434,7 +434,7 @@ let geniter init finalize ncores ~chunksize compute al =
  	    (log_debug "sending task %d to worker %d" i w;
  	     let oc = ocs.(w) in
  	     (Marshal.to_channel oc (Task i) []); flush oc)
- 	| Error (core,msg) -> handle_exc core msg
+ 	| (Error (core,msg): msg_to_master) -> handle_exc core msg
        done;
 
        (* send termination token to all children *)
@@ -537,7 +537,7 @@ let parfold
 let mapi_range lo hi (f:int -> 'a -> 'b) a =
   let l = hi-lo in
   if l < 0 then [||] else begin
-    let r = Array.create (l+1) (f 0 (Array.unsafe_get a lo)) in
+    let r = Array.make (l+1) (f 0 (Array.unsafe_get a lo)) in
     for i = 1 to l do
       let idx = lo+i in
       Array.unsafe_set r i (f idx (Array.unsafe_get a idx))
