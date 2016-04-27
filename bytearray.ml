@@ -36,15 +36,15 @@ let unsafe_blit_to_string a i s j l =
 *)
 
 external unsafe_blit_from_string : string -> int -> t -> int -> int -> unit
-  = "ml_blit_string_to_bigarray" "noalloc"
+  = "ml_blit_string_to_bigarray" [@@noalloc]
 
 external unsafe_blit_to_string : t -> int -> string -> int -> int -> unit
-  = "ml_blit_bigarray_to_string" "noalloc"
+  = "ml_blit_bigarray_to_string" [@@noalloc]
 
 let to_string a =
   let l = length a in
   if l > Sys.max_string_length then invalid_arg "Bytearray.to_string" else
-  let s = String.create l in
+  let s = Bytes.create l in
   unsafe_blit_to_string a 0 s 0 l;
   s
 
@@ -66,7 +66,7 @@ let sub a ofs len =
   then
     invalid_arg "Bytearray.sub"
   else begin
-    let s = String.create len in
+    let s = Bytes.create len in
     unsafe_blit_to_string a ofs s 0 len;
     s
   end
@@ -103,10 +103,10 @@ external unmarshal : t -> int -> 'a
   = "ml_unmarshal_from_bigarray"
 
 external unsafe_blit_from_floatarray : float array -> int -> tf -> int -> int -> unit
-  = "ml_blit_floatarray_to_bigarray" "noalloc"
+  = "ml_blit_floatarray_to_bigarray" [@@noalloc]
 
 external unsafe_blit_to_floatarray : tf -> int -> float array -> int -> int -> unit
-  = "ml_blit_bigarray_to_floatarray" "noalloc"
+  = "ml_blit_bigarray_to_floatarray" [@@noalloc]
 
 let to_floatarray a l =
   let fa = Obj.obj (Obj.new_block Obj.double_array_tag l) in
