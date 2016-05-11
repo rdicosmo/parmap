@@ -7,9 +7,9 @@ let _ = dispatch begin function
       flag ["compile"; "c"] & S[ A"-ccopt"; A"-D_GNU_SOURCE"; A"-ccopt"; A"-fPIC" ];
 
       flag ["link"; "library"; "ocaml"; "byte"; "use_libparmap"] &
-        S[A"-dllib"; A"-lparmap_stubs";];
+        S[A"-dllib"; A"-lparmap_stubs"; A"setcore.cmo"];
       flag ["link"; "library"; "ocaml"; "native"; "use_libparmap"] &
-          S[A"-cclib"; A"-lparmap_stubs"];
+          S[A"-cclib"; A"-lparmap_stubs"; A"setcore.cmx"];
       dep ["link"; "ocaml"; "use_libparmap"] ["libparmap_stubs.a"];
       flag ["link"; "ocaml"; "link_libparmap"] (A"libparmap_stubs.a");
 
