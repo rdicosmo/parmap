@@ -42,10 +42,14 @@ let can_redirect path =
     try
       Unix.mkdir path 0o777; true
     with Unix.Unix_error(e,_s,_s') ->
-      (Printf.eprintf "[Pid %d]: Error creating %s : %s; proceeding without \
-                       stdout/stderr redirection\n%!"
-	 (Unix.getpid ()) path (Unix.error_message e));
-      false
+      (* another job may have created it between the check and the mkdir *)
+      if e == Unix.EEXIST then true
+      else begin
+	      (Printf.eprintf "[Pid %d]: Error creating %s : %s; proceeding \
+			       without stdout/stderr redirection\n%!"
+		 (Unix.getpid ()) path (Unix.error_message e));
+	      false
+	end
   else true
 
 let log_debug fmt =
