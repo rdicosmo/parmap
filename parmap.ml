@@ -117,6 +117,33 @@ let marshal fd v =
   let s = Marshal.to_string v [Marshal.Closures] in
   ignore(Bytearray.mmap_of_string fd s)
 
+let spawn_many n ~in_subprocess =
+  let rec loop i acc =
+    if i = n then
+      acc
+    else
+      match Unix.fork() with
+        0 ->
+        in_subprocess i;
+        exit 0
+      | -1 ->
+        Utils.log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
+        loop (i + 1) acc
+      | pid ->
+        loop (i + 1) (pid :: acc)
+  in
+  loop 0 []
+
+let wait_for_pids pids =
+  let wait_for_pid pid =
+    try ignore(Unix.waitpid [] pid : int * Unix.process_status)
+    with Unix.Unix_error (Unix.ECHILD, _, _) -> ()
+  in
+  List.iter wait_for_pid pids
+
+let run_many n ~in_subprocess =
+  wait_for_pids (spawn_many n ~in_subprocess)
+
 (* a simple mapper function that computes 1/nth of the data on each of the n
    cores in one iteration *)
 let simplemapper (init:int -> unit) (finalize: unit -> unit) ncores compute opid al collect =
@@ -133,34 +160,21 @@ let simplemapper (init:int -> unit) (finalize: unit -> unit) ncores compute opid
   let fdarr=Array.init ncores (fun _ -> Utils.tempfd()) in
   (* call the GC before forking *)
   Gc.compact ();
-  (* spawn children *)
-  for i = 0 to ncores-1 do
-    match Unix.fork() with
-      0 ->
-	begin
-	  init i;  (* call initialization function *)
-	  Pervasives.at_exit finalize; (* register finalization function *)
-          let lo=i*chunksize in
-          let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
-          let exc_handler e j = (* handle an exception at index j *)
-	    Utils.log_error
-              "error at index j=%d in (%d,%d), chunksize=%d of a total of \
-               %d got exception %s on core %d \n%!"
-	      j lo hi chunksize (hi-lo+1) (Printexc.to_string e) i;
-	    exit 1
-          in
-	  let v = compute al lo hi opid exc_handler in
-          marshal fdarr.(i) v;
-          exit 0
-	end
-    | -1  -> Utils.log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
-    | _pid -> ()
-  done;
-  (* wait for all children *)
-  for _i = 0 to ncores-1 do
-    try ignore(Unix.wait())
-    with Unix.Unix_error (Unix.ECHILD, _, _) -> ()
-  done;
+  (* run children *)
+  run_many ncores ~in_subprocess:(fun i ->
+    init i;  (* call initialization function *)
+    Pervasives.at_exit finalize; (* register finalization function *)
+    let lo=i*chunksize in
+    let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
+    let exc_handler e j = (* handle an exception at index j *)
+      Utils.log_error
+        "error at index j=%d in (%d,%d), chunksize=%d of a total of \
+         %d got exception %s on core %d \n%!"
+        j lo hi chunksize (hi-lo+1) (Printexc.to_string e) i;
+      exit 1
+    in
+    let v = compute al lo hi opid exc_handler in
+    marshal fdarr.(i) v);
   (* read in all data *)
   let res = ref [] in
   (* iterate in reverse order, to accumulate in the right order *)
@@ -184,33 +198,20 @@ let simpleiter init finalize ncores compute al =
     ln ncores chunksize;
   (* call the GC before forking *)
   Gc.compact ();
-  (* spawn children *)
-  for i = 0 to ncores-1 do
-    match Unix.fork() with
-      0 ->
-	begin
-          init i;  (* call initialization function *)
-	  Pervasives.at_exit finalize; (* register finalization function *)
-          let lo=i*chunksize in
-          let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
-          let exc_handler e j = (* handle an exception at index j *)
-	    Utils.log_error
-              "error at index j=%d in (%d,%d), chunksize=%d of a total of \
-               %d got exception %s on core %d \n%!"
-	      j lo hi chunksize (hi-lo+1) (Printexc.to_string e) i;
-	    exit 1
-          in
-	  compute al lo hi exc_handler;
-          exit 0
-	end
-    | -1  -> Utils.log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
-    | _pid -> ()
-  done;
-  (* wait for all children *)
-  for _i = 0 to ncores-1 do
-    try ignore(Unix.wait())
-    with Unix.Unix_error (Unix.ECHILD, _, _) -> ()
-  done
+  (* run children *)
+  run_many ncores ~in_subprocess:(fun i ->
+    init i;  (* call initialization function *)
+    Pervasives.at_exit finalize; (* register finalization function *)
+    let lo=i*chunksize in
+    let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
+    let exc_handler e j = (* handle an exception at index j *)
+      Utils.log_error
+        "error at index j=%d in (%d,%d), chunksize=%d of a total of \
+         %d got exception %s on core %d \n%!"
+	j lo hi chunksize (hi-lo+1) (Printexc.to_string e) i;
+      exit 1
+    in
+    compute al lo hi exc_handler);
   (* return with no value *)
 
 (* a more sophisticated mapper function, with automatic load balancing *)
@@ -234,7 +235,7 @@ let setup_children_chans oc pipedown ?fdarr i =
   let finish () =
     (log_debug "shutting down (pid=%d)\n%!" pid;
      try close_in ic; close_out oc with _ -> ()
-    ); 
+    );
     exit 0 in
   receive, signal, return, finish, pid
 
@@ -267,50 +268,45 @@ let mapper (init:int -> unit) (finalize:unit -> unit) ncores ~chunksize compute 
        let oc_up = Unix.out_channel_of_descr pipeup_wr in
        (* call the GC before forking *)
        Gc.compact ();
-       (* spawn children *)
-       for i = 0 to ncores-1 do
-         match Unix.fork() with
-           0 ->
-             begin
-	       init i; (* call initialization function *)
-	       Pervasives.at_exit finalize; (* register finalization function *)
-               let d=Unix.gettimeofday()  in
-               (* primitives for communication *)
-               Unix.close pipeup_rd;
-               let receive,signal,return,finish,pid =
-                 setup_children_chans oc_up pipedown ~fdarr i in
-               let reschunk=ref opid in
-               let computetask n = (* compute chunk number n *)
-         	let lo=n*chunksize in
-         	let hi=if n=ntasks-1 then ln-1 else (n+1)*chunksize-1 in
-         	let exc_handler e j = (* handle an exception at index j *)
-         	  begin
-         	    let errmsg = Printexc.to_string e in
-                    Utils.log_error
-                      "error at index j=%d in (%d,%d), chunksize=%d of a \
-                       total of %d got exception %s on core %d \n%!"
-         	      j lo hi chunksize (hi-lo+1) errmsg i;
-         	    signal (Error (i,errmsg): msg_to_master);
-                    finish()
-         	  end
-         	in
-         	reschunk:= compute al lo hi !reschunk exc_handler;
-         	log_debug
-                  "worker on core %d (pid=%d), segment (%d,%d) of data of \
-                   length %d, chunksize=%d finished in %f seconds"
-         	  i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
-               in
-               while true do
-         	(* ask for work until we are finished *)
-         	signal (Ready i);
-         	match receive() with
-         	| Finished -> return (!reschunk:'d); finish ()
-         	| Task n -> computetask n
-               done;
-             end
-         | -1  -> Utils.log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
-         | _pid -> ()
-       done;
+       (* run children *)
+       let pids =
+         spawn_many ncores ~in_subprocess:(fun i ->
+	   init i; (* call initialization function *)
+	   Pervasives.at_exit finalize; (* register finalization function *)
+           let d=Unix.gettimeofday()  in
+           (* primitives for communication *)
+           Unix.close pipeup_rd;
+           let receive,signal,return,finish,pid =
+             setup_children_chans oc_up pipedown ~fdarr i in
+           let reschunk=ref opid in
+           let computetask n = (* compute chunk number n *)
+             let lo=n*chunksize in
+             let hi=if n=ntasks-1 then ln-1 else (n+1)*chunksize-1 in
+             let exc_handler e j = (* handle an exception at index j *)
+               begin
+                 let errmsg = Printexc.to_string e in
+                 Utils.log_error
+                   "error at index j=%d in (%d,%d), chunksize=%d of a \
+                    total of %d got exception %s on core %d \n%!"
+         	   j lo hi chunksize (hi-lo+1) errmsg i;
+                 signal (Error (i,errmsg): msg_to_master);
+                 finish()
+               end
+             in
+             reschunk:= compute al lo hi !reschunk exc_handler;
+             log_debug
+               "worker on core %d (pid=%d), segment (%d,%d) of data of \
+                length %d, chunksize=%d finished in %f seconds"
+               i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
+           in
+           while true do
+             (* ask for work until we are finished *)
+             signal (Ready i);
+             match receive() with
+             | Finished -> return (!reschunk:'d); finish ()
+             | Task n -> computetask n
+           done)
+       in
 
        (* close unused ends of the pipes *)
        Array.iter (fun (rfd,_) -> Unix.close rfd) pipedown;
@@ -340,10 +336,7 @@ let mapper (init:int -> unit) (finalize:unit -> unit) ncores ~chunksize compute 
        ) ocs;
 
        (* wait for all children to terminate *)
-       for _i = 0 to ncores-1 do
-         try ignore(Unix.wait())
-         with Unix.Unix_error (Unix.ECHILD, _, _) -> ()
-       done;
+       wait_for_pids pids;
 
        (* read in all data *)
        let res = ref [] in
@@ -379,48 +372,43 @@ let geniter init finalize ncores ~chunksize compute al =
        (* call the GC before forking *)
        Gc.compact ();
        (* spawn children *)
-       for i = 0 to ncores-1 do
- 	match Unix.fork() with
- 	  0 ->
- 	    begin
-	       init i; (* call initialization function *)
-	       Pervasives.at_exit finalize; (* register finalization function *)
-               let d=Unix.gettimeofday()  in
-               (* primitives for communication *)
-               Unix.close pipeup_rd;
-               let receive,signal,return,finish,pid =
-                 setup_children_chans oc_up pipedown i in
-               let computetask n = (* compute chunk number n *)
- 		let lo=n*chunksize in
- 		let hi=if n=ntasks-1 then ln-1 else (n+1)*chunksize-1 in
- 		let exc_handler e j = (* handle an exception at index j *)
- 		  begin
- 		    let errmsg = Printexc.to_string e in
-                    Utils.log_error
-                      "error at index j=%d in (%d,%d), chunksize=%d of \
-                       a total of %d got exception %s on core %d \n%!"
- 		      j lo hi chunksize (hi-lo+1) errmsg i;
- 		    signal (Error (i,errmsg): msg_to_master);
-                    finish()
- 		  end
- 		in
- 		compute al lo hi exc_handler;
- 		log_debug
-                  "worker on core %d (pid=%d), segment (%d,%d) of data \
-                   of length %d, chunksize=%d finished in %f seconds"
- 		  i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
- 	      in
- 	      while true do
- 		(* ask for work until we are finished *)
- 		signal (Ready i);
- 		match receive() with
- 		| Finished -> return(); finish ()
- 		| Task n -> computetask n
- 	      done;
- 	    end
- 	| -1  -> Utils.log_error "fork error: pid %d; i=%d" (Unix.getpid()) i;
- 	| _pid -> ()
-       done;
+       let pids =
+         spawn_many ncores ~in_subprocess:(fun i ->
+	   init i; (* call initialization function *)
+	   Pervasives.at_exit finalize; (* register finalization function *)
+           let d=Unix.gettimeofday()  in
+           (* primitives for communication *)
+           Unix.close pipeup_rd;
+           let receive,signal,return,finish,pid =
+             setup_children_chans oc_up pipedown i in
+           let computetask n = (* compute chunk number n *)
+ 	     let lo=n*chunksize in
+ 	     let hi=if n=ntasks-1 then ln-1 else (n+1)*chunksize-1 in
+ 	     let exc_handler e j = (* handle an exception at index j *)
+ 	       begin
+ 		 let errmsg = Printexc.to_string e in
+                 Utils.log_error
+                   "error at index j=%d in (%d,%d), chunksize=%d of \
+                    a total of %d got exception %s on core %d \n%!"
+ 		   j lo hi chunksize (hi-lo+1) errmsg i;
+ 		 signal (Error (i,errmsg): msg_to_master);
+                 finish()
+ 	       end
+ 	     in
+ 	     compute al lo hi exc_handler;
+ 	     log_debug
+               "worker on core %d (pid=%d), segment (%d,%d) of data \
+                of length %d, chunksize=%d finished in %f seconds"
+ 	       i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
+ 	   in
+ 	   while true do
+ 	     (* ask for work until we are finished *)
+ 	     signal (Ready i);
+ 	     match receive() with
+ 	     | Finished -> return(); finish ()
+ 	     | Task n -> computetask n
+           done)
+       in
 
        (* close unused ends of the pipes *)
        Array.iter (fun (rfd,_) -> Unix.close rfd) pipedown;
@@ -449,10 +437,7 @@ let geniter init finalize ncores ~chunksize compute al =
        ) ocs;
 
        (* wait for all children to terminate *)
-       for _i = 0 to ncores-1 do
- 	try ignore(Unix.wait())
- 	with Unix.Unix_error (Unix.ECHILD, _, _) -> ()
-       done
+       wait_for_pids pids;
        (* no data to return *)
   end
 
