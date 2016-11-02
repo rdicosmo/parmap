@@ -117,6 +117,9 @@ let marshal fd v =
   let s = Marshal.to_string v [Marshal.Closures] in
   ignore(Bytearray.mmap_of_string fd s)
 
+(* Exit the program with calling [at_exit] handlers *)
+external sys_exit : int -> 'a = "caml_sys_exit"
+
 let spawn_many n ~in_subprocess =
   let rec loop i acc =
     if i = n then
@@ -124,6 +127,14 @@ let spawn_many n ~in_subprocess =
     else
       match Unix.fork() with
         0 ->
+        (* [at_exit] handlers are called in reverse order of registration.
+           By registering a handler that exits prematurely, we prevent the
+           execution of handlers registered before the fork.
+
+           This ignores the exit code provided by the user, but we ignore
+           it anyway in [wait_for_pids].
+        *)
+        at_exit (fun () -> sys_exit 0);
         in_subprocess i;
         exit 0
       | -1 ->
