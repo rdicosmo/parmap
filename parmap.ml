@@ -146,9 +146,11 @@ let spawn_many n ~in_subprocess =
   loop 0 []
 
 let wait_for_pids pids =
-  let wait_for_pid pid =
+  let rec wait_for_pid pid =
     try ignore(Unix.waitpid [] pid : int * Unix.process_status)
-    with Unix.Unix_error (Unix.ECHILD, _, _) -> ()
+    with
+    | Unix.Unix_error (Unix.ECHILD, _, _) -> ()
+    | Unix.Unix_error (Unix.EINTR, _, _) -> wait_for_pid pid
   in
   List.iter wait_for_pid pids
 
