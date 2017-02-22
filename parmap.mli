@@ -30,6 +30,10 @@ val set_default_ncores : int -> unit
 
 val get_default_ncores : unit -> int
 
+(** {6 Getting ncores being used during parallel execution } *)
+
+val get_ncores : unit -> int
+
 (** {6 Sequence type, subsuming lists and arrays} *)
 
 type 'a sequence = L of 'a list | A of 'a array;;
