@@ -38,6 +38,13 @@ let rank = ref masters_rank
 let set_rank n = rank := n
 let get_rank () = !rank
 
+(* number of cores *)
+
+let ncores = ref 0;;
+
+let set_ncores n = ncores := n;;
+let get_ncores () = !ncores
+
 (* exception handling code *)
 
 let handle_exc core msg =
@@ -168,26 +175,26 @@ let run_many n ~in_subprocess =
 
 (* a simple mapper function that computes 1/nth of the data on each of the n
    cores in one iteration *)
-let simplemapper (init:int -> unit) (finalize: unit -> unit) ncores compute opid al collect =
+let simplemapper (init:int -> unit) (finalize: unit -> unit) ncores' compute opid al collect =
   (* flush everything *)
   flush_all();
   (* init task parameters *)
   let ln = Array.length al in
-  let ncores = min ln (max 1 ncores) in
-  let chunksize = max 1 (ln/ncores) in
+  set_ncores (min ln (max 1 ncores'));
+  let chunksize = max 1 (ln / !ncores) in
   log_debug
     "simplemapper on %d elements, on %d cores, chunksize = %d%!"
-    ln ncores chunksize;
+    ln !ncores chunksize;
   (* create descriptors to mmap *)
-  let fdarr=Array.init ncores (fun _ -> Utils.tempfd()) in
+  let fdarr=Array.init !ncores (fun _ -> Utils.tempfd()) in
   (* call the GC before forking *)
   Gc.compact ();
   (* run children *)
-  run_many ncores ~in_subprocess:(fun i ->
+  run_many !ncores ~in_subprocess:(fun i ->
     init i;  (* call initialization function *)
     Pervasives.at_exit finalize; (* register finalization function *)
     let lo=i*chunksize in
-    let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
+    let hi=if i = !ncores - 1 then ln - 1 else (i + 1) * chunksize - 1 in
     let exc_handler e j = (* handle an exception at index j *)
       Utils.log_error
         "error at index j=%d in (%d,%d), chunksize=%d of a total of \
@@ -200,32 +207,32 @@ let simplemapper (init:int -> unit) (finalize: unit -> unit) ncores compute opid
   (* read in all data *)
   let res = ref [] in
   (* iterate in reverse order, to accumulate in the right order *)
-  for i = 0 to ncores-1 do
-      res:= ((unmarshal fdarr.((ncores-1)-i)):'d)::!res;
+  for i = 0 to !ncores - 1 do
+      res:= ((unmarshal fdarr.((!ncores-1)-i)):'d)::!res;
   done;
   (* collect all results *)
   collect !res
 
 (* a simple iteration function that iterates on 1/nth of the data on each of
    the n cores *)
-let simpleiter init finalize ncores compute al =
+let simpleiter init finalize ncores' compute al =
   (* flush everything *)
   flush_all();
   (* init task parameters *)
   let ln = Array.length al in
-  let ncores = min ln (max 1 ncores) in
-  let chunksize = max 1 (ln/ncores) in
+  set_ncores (min ln (max 1 ncores'));
+  let chunksize = max 1 (ln / !ncores) in
   log_debug
     "simplemapper on %d elements, on %d cores, chunksize = %d%!"
-    ln ncores chunksize;
+    ln !ncores chunksize;
   (* call the GC before forking *)
   Gc.compact ();
   (* run children *)
-  run_many ncores ~in_subprocess:(fun i ->
+  run_many !ncores ~in_subprocess:(fun i ->
     init i;  (* call initialization function *)
     Pervasives.at_exit finalize; (* register finalization function *)
     let lo=i*chunksize in
-    let hi=if i=ncores-1 then ln-1 else (i+1)*chunksize-1 in
+    let hi=if i= !ncores - 1 then ln-1 else (i+1)*chunksize-1 in
     let exc_handler e j = (* handle an exception at index j *)
       Utils.log_error
         "error at index j=%d in (%d,%d), chunksize=%d of a total of \
@@ -262,19 +269,19 @@ let setup_children_chans oc pipedown ?fdarr i =
   receive, signal, return, finish, pid
 
 (* parametric mapper primitive that captures the parallel structure *)
-let mapper (init:int -> unit) (finalize:unit -> unit) ncores ~chunksize compute opid al collect =
+let mapper (init:int -> unit) (finalize:unit -> unit) ncores' ~chunksize compute opid al collect =
   let ln = Array.length al in
   if ln=0 then (collect []) else
   begin
-   let ncores = min ln (max 1 ncores) in
-   log_debug "mapper on %d elements, on %d cores%!" ln ncores;
+   set_ncores (min ln (max 1 ncores'));
+   log_debug "mapper on %d elements, on %d cores%!" ln !ncores;
    match chunksize with
      None ->
        (* no need of load balancing *)
-       simplemapper init finalize ncores compute opid al collect
-   | Some v when ncores >= ln/v ->
+       simplemapper init finalize !ncores compute opid al collect
+   | Some v when !ncores >= ln/v ->
        (* no need of load balancing if more cores than tasks *)
-       simplemapper init finalize ncores compute opid al collect
+       simplemapper init finalize !ncores compute opid al collect
    | Some v ->
        (* init task parameters : ntasks > 0 here,
           as otherwise ncores >= 1 >= ln/v = ntasks and we would take
@@ -283,16 +290,16 @@ let mapper (init:int -> unit) (finalize:unit -> unit) ncores ~chunksize compute 
        (* flush everything *)
        flush_all ();
        (* create descriptors to mmap *)
-       let fdarr=Array.init ncores (fun _ -> Utils.tempfd()) in
+       let fdarr=Array.init !ncores (fun _ -> Utils.tempfd()) in
        (* setup communication channel with the workers *)
-       let pipedown=Array.init ncores (fun _ -> Unix.pipe ()) in
+       let pipedown=Array.init !ncores (fun _ -> Unix.pipe ()) in
        let pipeup_rd,pipeup_wr=Unix.pipe () in
        let oc_up = Unix.out_channel_of_descr pipeup_wr in
        (* call the GC before forking *)
        Gc.compact ();
        (* run children *)
        let pids =
-         spawn_many ncores ~in_subprocess:(fun i ->
+         spawn_many !ncores ~in_subprocess:(fun i ->
 	   init i; (* call initialization function *)
 	   Pervasives.at_exit finalize; (* register finalization function *)
            let d=Unix.gettimeofday()  in
@@ -336,7 +343,7 @@ let mapper (init:int -> unit) (finalize:unit -> unit) ncores ~chunksize compute 
 
        (* get ic/oc/wfdl *)
        let ocs=
-         Array.init ncores
+         Array.init !ncores
            (fun n -> Unix.out_channel_of_descr (snd pipedown.(n))) in
        let ic=Unix.in_channel_of_descr pipeup_rd in
 
@@ -363,39 +370,39 @@ let mapper (init:int -> unit) (finalize:unit -> unit) ncores ~chunksize compute 
        (* read in all data *)
        let res = ref [] in
        (* iterate in reverse order, to accumulate in the right order *)
-       for i = 0 to ncores-1 do
-         res:= ((unmarshal fdarr.((ncores-1)-i)):'d)::!res;
+       for i = 0 to !ncores-1 do
+         res:= ((unmarshal fdarr.((!ncores-1)-i)):'d)::!res;
        done;
        (* collect all results *)
        collect !res
   end
 
 (* parametric iteration primitive that captures the parallel structure *)
-let geniter init finalize ncores ~chunksize compute al =
+let geniter init finalize ncores' ~chunksize compute al =
   let ln = Array.length al in
   if ln=0 then () else
   begin
-   let ncores = min ln (max 1 ncores) in
-   log_debug "geniter on %d elements, on %d cores%!" ln ncores;
+   set_ncores (min ln (max 1 ncores'));
+   log_debug "geniter on %d elements, on %d cores%!" ln !ncores;
    match chunksize with
      None ->
-       simpleiter init finalize ncores compute al (* no need of load balancing *)
-   | Some v when ncores >= ln/v ->
-       simpleiter init finalize ncores compute al (* no need of load balancing *)
+       simpleiter init finalize !ncores compute al (* no need of load balancing *)
+   | Some v when !ncores >= ln/v ->
+       simpleiter init finalize !ncores compute al (* no need of load balancing *)
    | Some v ->
        (* init task parameters *)
        let chunksize = v and ntasks = ln/v in
        (* flush everything *)
        flush_all ();
        (* setup communication channel with the workers *)
-       let pipedown=Array.init ncores (fun _ -> Unix.pipe ()) in
+       let pipedown=Array.init !ncores (fun _ -> Unix.pipe ()) in
        let pipeup_rd,pipeup_wr=Unix.pipe () in
        let oc_up = Unix.out_channel_of_descr pipeup_wr in
        (* call the GC before forking *)
        Gc.compact ();
        (* spawn children *)
        let pids =
-         spawn_many ncores ~in_subprocess:(fun i ->
+         spawn_many !ncores ~in_subprocess:(fun i ->
 	   init i; (* call initialization function *)
 	   Pervasives.at_exit finalize; (* register finalization function *)
            let d=Unix.gettimeofday()  in
@@ -437,7 +444,7 @@ let geniter init finalize ncores ~chunksize compute al =
        Unix.close pipeup_wr;
 
        (* get ic/oc/wfdl *)
-       let ocs=Array.init ncores
+       let ocs=Array.init !ncores
          (fun n -> Unix.out_channel_of_descr (snd pipedown.(n))) in
        let ic=Unix.in_channel_of_descr pipeup_rd in
 
