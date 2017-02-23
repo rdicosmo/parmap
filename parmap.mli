@@ -30,6 +30,10 @@ val set_default_ncores : int -> unit
 
 val get_default_ncores : unit -> int
 
+(** {6 Getting ncores being used during parallel execution } *)
+
+val get_ncores : unit -> int
+
 (** {6 Getting the current worker rank. The master process has rank -1. Other processes
     have the rank at which they were forked out (a worker's rank is in [0..ncores-1]) } *)
 
