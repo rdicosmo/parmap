@@ -30,6 +30,14 @@ let default_ncores=ref (max 2 (Setcore.numcores()-1));;
 let set_default_ncores n = default_ncores := n;;
 let get_default_ncores () = !default_ncores;;
 
+(* worker process rank *)
+
+let masters_rank = -1
+let rank = ref masters_rank
+
+let set_rank n = rank := n
+let get_rank () = !rank
+
 (* exception handling code *)
 
 let handle_exc core msg =
@@ -135,6 +143,7 @@ let spawn_many n ~in_subprocess =
            it anyway in [wait_for_pids].
         *)
         at_exit (fun () -> sys_exit 0);
+        set_rank i;
         in_subprocess i;
         exit 0
       | -1 ->
