@@ -35,6 +35,14 @@ let ncores = ref 0;;
 let set_ncores n = ncores := n;;
 let get_ncores () = !ncores
 
+(* worker process rank *)
+
+let masters_rank = -1
+let rank = ref masters_rank>>>>>>> master
+
+let set_rank n = rank := n
+let get_rank () = !rank
+
 (* exception handling code *)
 
 let handle_exc core msg =
@@ -140,6 +148,7 @@ let spawn_many n ~in_subprocess =
            it anyway in [wait_for_pids].
         *)
         at_exit (fun () -> sys_exit 0);
+        set_rank i;
         in_subprocess i;
         exit 0
       | -1 ->
@@ -148,6 +157,8 @@ let spawn_many n ~in_subprocess =
       | pid ->
         loop (i + 1) (pid :: acc)
   in
+  (* call the GC before forking *)
+  Gc.compact ();
   loop 0 []
 
 let wait_for_pids pids =
@@ -176,8 +187,6 @@ let simplemapper (init:int -> unit) (finalize: unit -> unit) ncores' compute opi
     ln !ncores chunksize;
   (* create descriptors to mmap *)
   let fdarr=Array.init !ncores (fun _ -> Utils.tempfd()) in
-  (* call the GC before forking *)
-  Gc.compact ();
   (* run children *)
   run_many !ncores ~in_subprocess:(fun i ->
     init i;  (* call initialization function *)
@@ -214,8 +223,6 @@ let simpleiter init finalize ncores' compute al =
   log_debug
     "simplemapper on %d elements, on %d cores, chunksize = %d%!"
     ln !ncores chunksize;
-  (* call the GC before forking *)
-  Gc.compact ();
   (* run children *)
   run_many !ncores ~in_subprocess:(fun i ->
     init i;  (* call initialization function *)
@@ -284,8 +291,6 @@ let mapper (init:int -> unit) (finalize:unit -> unit) ncores' ~chunksize compute
        let pipedown=Array.init !ncores (fun _ -> Unix.pipe ()) in
        let pipeup_rd,pipeup_wr=Unix.pipe () in
        let oc_up = Unix.out_channel_of_descr pipeup_wr in
-       (* call the GC before forking *)
-       Gc.compact ();
        (* run children *)
        let pids =
          spawn_many !ncores ~in_subprocess:(fun i ->
@@ -387,8 +392,6 @@ let geniter init finalize ncores' ~chunksize compute al =
        let pipedown=Array.init !ncores (fun _ -> Unix.pipe ()) in
        let pipeup_rd,pipeup_wr=Unix.pipe () in
        let oc_up = Unix.out_channel_of_descr pipeup_wr in
-       (* call the GC before forking *)
-       Gc.compact ();
        (* spawn children *)
        let pids =
          spawn_many !ncores ~in_subprocess:(fun i ->

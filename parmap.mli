@@ -34,6 +34,11 @@ val get_default_ncores : unit -> int
 
 val get_ncores : unit -> int
 
+(** {6 Getting the current worker rank. The master process has rank -1. Other processes
+    have the rank at which they were forked out (a worker's rank is in [0..ncores-1]) } *)
+
+val get_rank : unit -> int
+
 (** {6 Sequence type, subsuming lists and arrays} *)
 
 type 'a sequence = L of 'a list | A of 'a array;;
