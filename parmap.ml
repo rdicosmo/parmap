@@ -38,7 +38,7 @@ let get_ncores () = !ncores
 (* worker process rank *)
 
 let masters_rank = -1
-let rank = ref masters_rank>>>>>>> master
+let rank = ref masters_rank
 
 let set_rank n = rank := n
 let get_rank () = !rank
