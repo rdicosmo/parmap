@@ -34,6 +34,13 @@ val get_default_ncores : unit -> int
 
 val get_ncores : unit -> int
 
+(** {6 Setting and getting an explicity mapping from processes to cores } *)
+
+val set_core_mapping: int array -> unit
+  (** [set_core_mapping m] installs the array [m] as the mapping to be used to pin
+      processes to cores. Process [i] will be pinned to core [m.(i mod Array.length m)].
+      *)
+    
 (** {6 Getting the current worker rank. The master process has rank -1. Other processes
     have the rank at which they were forked out (a worker's rank is in [0..ncores-1]) } *)
 
