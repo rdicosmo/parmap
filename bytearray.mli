@@ -18,9 +18,9 @@ type tf =
 val create : int -> t
 
 val length : t -> int
-
+(*
 val to_string : t -> string
-
+ *)
 val of_string : string -> t
 
 val mmap_of_string : Unix.file_descr -> string -> t
@@ -30,13 +30,13 @@ val to_floatarray : tf -> int -> float array
 val to_this_floatarray : float array -> tf -> int -> float array
 
 val of_floatarray : float array -> tf
-
+(*
 val sub : t -> int -> int -> string
-
+ *)
 val blit_from_string : string -> int -> t -> int -> int -> unit
-
-val blit_to_string : t -> int -> string -> int -> int -> unit
-
+(*
+val blit_to_bytes : t -> int -> bytes -> int -> int -> unit
+ *)
 val prefix : t -> t -> int -> bool
 
 val marshal : 'a -> Marshal.extern_flags list -> t

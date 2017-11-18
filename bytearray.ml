@@ -37,17 +37,22 @@ let unsafe_blit_to_string a i s j l =
 
 external unsafe_blit_from_string : string -> int -> t -> int -> int -> unit
   = "ml_blit_string_to_bigarray" "noalloc"
-
-external unsafe_blit_to_string : t -> int -> string -> int -> int -> unit
+(*
+external unsafe_blit_to_bytes : t -> int -> bytes -> int -> int -> unit
   = "ml_blit_bigarray_to_string" "noalloc"
-
+ *)
+(*
+let unsafe_sub a ofs len =
+  let s = Bytes.create len in
+  unsafe_blit_to_bytes a ofs s 0 len;
+  Bytes.to_string s
+ *)
+(*
 let to_string a =
   let l = length a in
   if l > Sys.max_string_length then invalid_arg "Bytearray.to_string" else
-  let s = String.create l in
-  unsafe_blit_to_string a 0 s 0 l;
-  s
-
+  unsafe_sub a 0 l
+ *)
 let of_string s =
   let l = String.length s in
   let a = create l in
@@ -59,18 +64,15 @@ let mmap_of_string fd s =
   let ba = Bigarray.Array1.map_file fd Bigarray.char Bigarray.c_layout true l in
   unsafe_blit_from_string s 0 ba 0 l;
   ba
-
+(*
 let sub a ofs len =
   if
     ofs < 0 || len < 0 || ofs > length a - len || len > Sys.max_string_length
   then
     invalid_arg "Bytearray.sub"
-  else begin
-    let s = String.create len in
-    unsafe_blit_to_string a ofs s 0 len;
-    s
-  end
-
+  else
+    unsafe_sub a ofs len
+ *)
 let rec prefix_rec a i a' i' l =
   l = 0 ||
   (a.{i} = a'.{i'} && prefix_rec a (i + 1) a' (i' + 1) (l - 1))
@@ -86,13 +88,13 @@ let blit_from_string s i a j l =
            || j < 0 || j > length a - l
   then invalid_arg "Bytearray.blit_from_string"
   else unsafe_blit_from_string s i a j l
-
-let blit_to_string a i s j l =
+(*
+let blit_to_bytes a i s j l =
   if l < 0 || i < 0 || i > length a - l
-           || j < 0 || j > String.length s - l
-  then invalid_arg "Bytearray.blit_to_string"
-  else unsafe_blit_to_string a i s j l
-
+           || j < 0 || j > Bytes.length s - l
+  then invalid_arg "Bytearray.blit_to_bytes"
+  else unsafe_blit_to_bytes a i s j l
+ *)
 external marshal : 'a -> Marshal.extern_flags list -> t
   = "ml_marshal_to_bigarray"
 
