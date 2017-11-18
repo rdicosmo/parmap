@@ -35,7 +35,7 @@ val sub : t -> int -> int -> string
 
 val blit_from_string : string -> int -> t -> int -> int -> unit
 
-val blit_to_string : t -> int -> string -> int -> int -> unit
+val blit_to_bytes : t -> int -> bytes -> int -> int -> unit
 
 val prefix : t -> t -> int -> bool
 
