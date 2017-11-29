@@ -11,14 +11,14 @@
 (*  library, see the LICENSE file for more information.                   *)
 (**************************************************************************)
 
-(** Module [Parmap]: efficient parallel map, fold and mapfold on lists and 
-    arrays on multicores. 
+(** Module [Parmap]: efficient parallel map, fold and mapfold on lists and
+    arrays on multicores.
 
-    All the primitives allow to control the granularity of the parallelism 
+    All the primitives allow to control the granularity of the parallelism
     via an optional parameter [chunksize]: if [chunksize] is omitted, the
     input sequence is split evenly among the available cores; if [chunksize]
     is specified, the input data is split in chunks of size [chunksize] and
-    dispatched to the available cores using an on demand strategy that 
+    dispatched to the available cores using an on demand strategy that
     ensures automatic load balancing.
 
     A specific primitive [array_float_parmap] is provided for fast operations on float arrays.
@@ -39,8 +39,18 @@ val get_ncores : unit -> int
 val set_core_mapping: int array -> unit
   (** [set_core_mapping m] installs the array [m] as the mapping to be used to pin
       processes to cores. Process [i] will be pinned to core [m.(i mod Array.length m)].
-      *)
-    
+  *)
+
+val disable_core_pinning: unit -> unit
+  (** [disable_core_pinning ()] will prevent forked out processes
+      from being pinned to a specific core.
+      WARNING: this may have a negative impact on performance,
+      but might be necessary on systems where several parmap computations
+      are running concurrently. *)
+
+val enable_core_pinning: unit -> unit
+  (** [enable_core_pinning ()] turns on core pinning (which is the default). *)
+
 (** {6 Getting the current worker rank. The master process has rank -1. Other processes
     have the rank at which they were forked out (a worker's rank is in [0..ncores-1]) } *)
 
@@ -67,26 +77,26 @@ type 'a sequence = L of 'a list | A of 'a array;;
 (** {6 Parallel mapfold} *)
 
 val parmapfold : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a sequence -> ('b-> 'c -> 'c) -> 'c -> ('c->'c->'c) -> 'c
-  (** [parmapfold ~ncores:n f (L l) op b concat ] computes [List.fold_right op (List.map f l) b] 
-      by forking [n] processes on a multicore machine. 
+  (** [parmapfold ~ncores:n f (L l) op b concat ] computes [List.fold_right op (List.map f l) b]
+      by forking [n] processes on a multicore machine.
       You need to provide the extra [concat] operator to combine the partial results of the
-      fold computed on each core. If 'b = 'c, then [concat] may be simply [op]. 
-      The order of computation in parallel changes w.r.t. sequential execution, so this 
+      fold computed on each core. If 'b = 'c, then [concat] may be simply [op].
+      The order of computation in parallel changes w.r.t. sequential execution, so this
       function is only correct if [op] and [concat] are associative and commutative.
       If the optional [chunksize] parameter is specified,
       the processes compute the result in an on-demand fashion
       on blocks of size [chunksize].
-      [parmapfold ~ncores:n f (A a) op b concat ] computes [Array.fold_right op (Array.map f a) b] 
+      [parmapfold ~ncores:n f (A a) op b concat ] computes [Array.fold_right op (Array.map f a) b]
       *)
 
 (** {6 Parallel fold} *)
 
 val parfold: ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ('a -> 'b -> 'b) -> 'a sequence -> 'b -> ('b->'b->'b) -> 'b
-  (** [parfold ~ncores:n op (L l) b concat] computes [List.fold_right op l b] 
+  (** [parfold ~ncores:n op (L l) b concat] computes [List.fold_right op l b]
       by forking [n] processes on a multicore machine.
       You need to provide the extra [concat] operator to combine the partial results of the
-      fold computed on each core. If 'b = 'c, then [concat] may be simply [op]. 
-      The order of computation in parallel changes w.r.t. sequential execution, so this 
+      fold computed on each core. If 'b = 'c, then [concat] may be simply [op].
+      The order of computation in parallel changes w.r.t. sequential execution, so this
       function is only correct if [op] and [concat] are associative and commutative.
       If the optional [chunksize] parameter is specified,
       the processes compute the result in an on-demand fashion
@@ -97,9 +107,9 @@ val parfold: ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?
 (** {6 Parallel map} *)
 
 val parmap : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a sequence -> 'b list
-  (** [parmap  ~ncores:n f (L l) ] computes [List.map f l] 
+  (** [parmap  ~ncores:n f (L l) ] computes [List.map f l]
       by forking [n] processes on a multicore machine.
-      [parmap  ~ncores:n f (A a) ] computes [Array.map f a] 
+      [parmap  ~ncores:n f (A a) ] computes [Array.map f a]
       by forking [n] processes on a multicore machine.
       If the optional [chunksize] parameter is specified,
       the processes compute the result in an on-demand fashion
@@ -110,9 +120,9 @@ val parmap : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?
 (** {6 Parallel iteration} *)
 
 val pariter : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ('a -> unit) -> 'a sequence -> unit
-  (** [pariter  ~ncores:n f (L l) ] computes [List.iter f l] 
+  (** [pariter  ~ncores:n f (L l) ] computes [List.iter f l]
       by forking [n] processes on a multicore machine.
-      [parmap  ~ncores:n f (A a) ] computes [Array.iter f a] 
+      [parmap  ~ncores:n f (A a) ] computes [Array.iter f a]
       by forking [n] processes on a multicore machine.
       If the optional [chunksize] parameter is specified,
       the processes perform the computation in an on-demand fashion
@@ -140,7 +150,7 @@ val pariteri : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int ->
 (** {6 Parallel map on arrays} *)
 
 val array_parmap : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a array -> 'b array
-  (** [array_parmap  ~ncores:n f a ] computes [Array.map f a] 
+  (** [array_parmap  ~ncores:n f a ] computes [Array.map f a]
       by forking [n] processes on a multicore machine.
       If the optional [chunksize] parameter is specified,
       the processes compute the result in an on-demand fashion
@@ -165,7 +175,7 @@ val init_shared_buffer : float array -> buf
       This buffer can be reused in a series of calls to [array_float_parmap], avoiding the cost of reallocating it each time. *)
 
 val array_float_parmap : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ?result: float array -> ?sharedbuffer: buf -> ('a -> float) -> 'a array -> float array
-  (** [array_float_parmap  ~ncores:n f a ] computes [Array.map f a] by forking 
+  (** [array_float_parmap  ~ncores:n f a ] computes [Array.map f a] by forking
       [n] processes on a multicore machine, and preallocating the resulting
       array as shared memory, which allows significantly more efficient
       computation than calling the generic array_parmap function.  If the
@@ -203,12 +213,11 @@ val debugging : bool -> unit
 
 val redirect : ?path:string -> id:int -> unit
 
-  (** Helper function that redirects stdout and stderr to files 
-      located in the directory [path], carrying names of the shape 
+  (** Helper function that redirects stdout and stderr to files
+      located in the directory [path], carrying names of the shape
       stdout.NNN and stderr.NNN where NNN is the [id] of the used core.
       Useful when writing initialisation functions to be passed as
       [init] argument to the parallel combinators.
       The default value for [path] is /tmp/.parmap.PPPP with PPPP the
       process id of the main program.
    *)
-
