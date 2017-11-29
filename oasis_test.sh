@@ -1,8 +1,8 @@
 #!/bin/bash
 
-set -x
+set -x # DEBUG
 
 oasis setup
-ocaml setup.ml -configure 
+ocaml setup.ml -configure -prefix `opam config var prefix`
 ocaml setup.ml -build
-ocaml setup.ml -install
+ocaml setup.ml -reinstall
