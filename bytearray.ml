@@ -121,6 +121,6 @@ let to_this_floatarray fa a l =
 
 let of_floatarray fa =
   let l = Array.length fa in
-  let a = createf l in 
+  let a = createf l in
   unsafe_blit_from_floatarray fa 0 a 0 l;
   a

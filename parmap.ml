@@ -40,7 +40,7 @@ let get_ncores () = !ncores
 let core_mapping = ref None
 
 let set_core_mapping (m: int array) = core_mapping := Some m
-    
+
 (* worker process rank *)
 
 let masters_rank = -1
