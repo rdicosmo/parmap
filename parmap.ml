@@ -37,6 +37,14 @@ let get_ncores () = !ncores
 
 (* core mapping *)
 
+let no_core_pinning = ref false
+
+let disable_core_pinning () =
+  no_core_pinning := true
+
+let enable_core_pinning () =
+  no_core_pinning := false
+
 let core_mapping = ref None
 
 let set_core_mapping (m: int array) = core_mapping := Some m
@@ -252,11 +260,14 @@ type msg_to_master = Ready of int | Error of int * string
 type msg_to_worker = Finished | Task of int
 
 let setup_children_chans oc pipedown ?fdarr i =
-  (* map process i to core i, or, if a core_mapping exist, to core_mapping.(i), reusing core_mapping as many times as needed *)
-  (match !core_mapping with
-  | None ->   Setcore.setcore i
-  | Some m -> let ml = Array.length m in
-              Setcore.setcore m.(i mod ml));
+  (if !no_core_pinning then ()
+   else match !core_mapping with
+     (* map process i to core i, or, if a core_mapping exist,
+        to core_mapping.(i), reusing core_mapping as many times as needed *)
+     | None -> Setcore.setcore i
+     | Some m ->
+       let ml = Array.length m in
+       Setcore.setcore m.(i mod ml));
   (* close the other ends of the pipe and convert my ends to ic/oc *)
   Unix.close (snd pipedown.(i));
   let pid = Unix.getpid() in
