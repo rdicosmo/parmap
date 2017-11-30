@@ -34,6 +34,18 @@ val get_default_ncores : unit -> int
 
 val get_ncores : unit -> int
 
+(** {6 Enabling/disabling processes core pinning } *)
+
+val disable_core_pinning: unit -> unit
+  (** [disable_core_pinning ()] will prevent forked out processes
+      from being pinned to a specific core.
+      WARNING: this may have a negative impact on performance,
+      but might be necessary on systems where several parmap computations
+      are running concurrently. *)
+
+val enable_core_pinning: unit -> unit
+(** [enable_core_pinning ()] turns on core pinning (it is on by default). *)
+
 (** {6 Setting and getting an explicity mapping from processes to cores } *)
 
 val set_core_mapping: int array -> unit
