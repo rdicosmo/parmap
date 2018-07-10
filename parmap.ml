@@ -568,7 +568,7 @@ let parfold
 let mapi_range lo hi (f:int -> 'a -> 'b) a =
   let l = hi-lo in
   if l < 0 then [||] else begin
-    let r = Array.create (l+1) (f 0 (Array.unsafe_get a lo)) in
+    let r = Array.create (l+1) (f lo (Array.unsafe_get a lo)) in
     for i = 1 to l do
       let idx = lo+i in
       Array.unsafe_set r i (f idx (Array.unsafe_get a idx))
