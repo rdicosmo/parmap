@@ -4,6 +4,9 @@ AC_PROG_OCAML
 if test "$OCAMLC" = "no"; then
  AC_MSG_ERROR([You must install the OCaml compiler])
 fi
+if test "$OCAMLBUILD" = "no"; then
+ AC_MSG_ERROR([You must install OCamlbuild (the ocamlbuild command)])
+fi
 
 AC_PROG_FINDLIB
 AC_SUBST(OCAMLFIND)
