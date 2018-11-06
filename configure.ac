@@ -11,6 +11,12 @@ if test "$OCAMLFIND" = "no"; then
  AC_MSG_ERROR([You must install OCaml findlib (the ocamlfind command)])
 fi
 
+AC_PROG_OCAMLBUILD
+AC_SUBST(OCAMLBUILD)
+if test "$OCAMLBUILD" = "no"; then
+ AC_MSG_ERROR([You must install ocamlbuild])
+fi
+
 AC_HEADER_STDC
 AC_CHECK_HEADERS([sched.h])
 AC_CHECK_DECLS([sched_setaffinity], [], [], [[
