@@ -29,7 +29,7 @@ You *need*  to run your  program *on a single multicore  machine*;  repeat after
 `Parmap`  _is   not meant_ to   run  on a cluster,  see   one of the  many available
 (re)implementations of the map-reduce schema for that.
 
-By forking the parent process  on a sigle  machine, the children get access, for
+By forking the parent process  on a single machine, the children get access, for
 free, to all the data structures already built, even the imperative ones, and as
 far as your computation  inside the map/fold  does not produce side effects that
 need  to be  preserved, the  final result will   be the same  as  performing the
@@ -102,13 +102,14 @@ function must perform.
         # let d = Unix.gettimeofday() in ignore(Array.create 10000000 0.); Unix.gettimeofday() -. d;;
         - : float = 0.0501301288604736328
     ```
- 2. create a shared memory area 
 
- 3. possibly copy the result array to the shared memory area
+ 2. create a shared memory area ,
 
- 4. perform the computation in the children writing the result in the shared memory area
+ 3. possibly copy the result array to the shared memory area,
 
- 5. possibly copy the result back to the OCaml array
+ 4. perform the computation in the children writing the result in the shared memory area,
+
+ 5. possibly copy the result back to the OCaml array.
 
 All implementations need to do 1, 2 and 4; steps 3 and/or 5 may be omitted depending on
 what the user wants to do with the result.
