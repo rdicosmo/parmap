@@ -15,6 +15,10 @@ type t =
 type tf =
   (float, Bigarray.float64_elt, Bigarray.c_layout) Bigarray.Array1.t
 
+val map_file: Unix.file_descr ->
+  ('a, 'b) Bigarray.kind ->
+  'c Bigarray.layout -> bool -> int -> ('a, 'b, 'c) Bigarray.Array1.t
+
 val create : int -> t
 
 val length : t -> int
