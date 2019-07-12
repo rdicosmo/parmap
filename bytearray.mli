@@ -10,10 +10,10 @@
 (***************************************************************************)
 
 type t =
-  (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t
+  (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Genarray.t
 
 type tf =
-  (float, Bigarray.float64_elt, Bigarray.c_layout) Bigarray.Array1.t
+  (float, Bigarray.float64_elt, Bigarray.c_layout) Bigarray.Genarray.t
 
 val create : int -> t
 

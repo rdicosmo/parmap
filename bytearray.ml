@@ -13,15 +13,16 @@
 
 open Bigarray
 
-type t = (char, int8_unsigned_elt, c_layout) Array1.t
+type t = (char, int8_unsigned_elt, c_layout) Genarray.t
 
-type tf = (float, float64_elt, c_layout) Array1.t
+type tf = (float, float64_elt, c_layout) Genarray.t
 
-let length = Bigarray.Array1.dim
+let length a = (Bigarray.Genarray.dims a).(0)
 
-let create l = Bigarray.Array1.create Bigarray.char Bigarray.c_layout l
+let create l = Bigarray.Genarray.create Bigarray.char Bigarray.c_layout [|l|]
 
-let createf l = Bigarray.Array1.create Bigarray.float64 Bigarray.c_layout l
+let createf l =
+  Bigarray.Genarray.create Bigarray.float64 Bigarray.c_layout [|l|]
 
 (*
 let unsafe_blit_from_string s i a j l =
@@ -61,7 +62,7 @@ let of_string s =
 
 let mmap_of_string fd s =
   let l = String.length s in
-  let ba = Bigarray.Array1.map_file fd Bigarray.char Bigarray.c_layout true l in
+  let ba = Unix.map_file fd Bigarray.char Bigarray.c_layout true [|l|] in
   unsafe_blit_from_string s 0 ba 0 l;
   ba
 (*
@@ -75,7 +76,8 @@ let sub a ofs len =
  *)
 let rec prefix_rec a i a' i' l =
   l = 0 ||
-  (a.{i} = a'.{i'} && prefix_rec a (i + 1) a' (i' + 1) (l - 1))
+  (Bigarray.Genarray.get a [|i|] = Bigarray.Genarray.get a' [|i'|]) &&
+  prefix_rec a (i + 1) a' (i' + 1) (l - 1)
 
 let prefix a a' i =
   let l = length a in
