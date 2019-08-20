@@ -24,8 +24,6 @@ AC_CHECK_DECLS([thread_policy_set], [], [], [[
 #include <mach/thread_policy.h>
 ]])
 
-AC_CONFIG_HEADERS([config.h])
-
 if $OCAMLBUILD -use-ocamlfind >/dev/null 2>&1 ; then
   AC_MSG_RESULT(ocaml version $OCAMLVERSION. Use standard Makefile)
   AC_CONFIG_FILES([Makefile])
