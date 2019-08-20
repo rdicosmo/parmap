@@ -1,6 +1,6 @@
 <*>: annot
 #"libparmap.a": use_parmap
-<*.{ml,mli}>: package(unix), package(bigarray), package(setcore), package(bytearray), package(mmap)
+<*.{ml,mli}>: package(unix), package(bigarray), package(setcore), package(bytearray), package(stdlib-shims), package(mmap)
 
 
 <*sdl.*>: package(bigarray), package(sdl)

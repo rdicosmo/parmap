@@ -207,7 +207,7 @@ let simplemapper (init:int -> unit) (finalize: unit -> unit) ncores' compute opi
   (* run children *)
   run_many !ncores ~in_subprocess:(fun i ->
     init i;  (* call initialization function *)
-    Pervasives.at_exit finalize; (* register finalization function *)
+    Stdlib.at_exit finalize; (* register finalization function *)
     let lo=i*chunksize in
     let hi=if i = !ncores - 1 then ln - 1 else (i + 1) * chunksize - 1 in
     let exc_handler e j = (* handle an exception at index j *)
@@ -243,7 +243,7 @@ let simpleiter init finalize ncores' compute al =
   (* run children *)
   run_many !ncores ~in_subprocess:(fun i ->
     init i;  (* call initialization function *)
-    Pervasives.at_exit finalize; (* register finalization function *)
+    Stdlib.at_exit finalize; (* register finalization function *)
     let lo=i*chunksize in
     let hi=if i= !ncores - 1 then ln-1 else (i+1)*chunksize-1 in
     let exc_handler e j = (* handle an exception at index j *)
@@ -319,7 +319,7 @@ let mapper (init:int -> unit) (finalize:unit -> unit) ncores' ~chunksize compute
        let pids =
          spawn_many !ncores ~in_subprocess:(fun i ->
 	   init i; (* call initialization function *)
-	   Pervasives.at_exit finalize; (* register finalization function *)
+	   Stdlib.at_exit finalize; (* register finalization function *)
            let d=Unix.gettimeofday()  in
            (* primitives for communication *)
            Unix.close pipeup_rd;
@@ -420,7 +420,7 @@ let geniter init finalize ncores' ~chunksize compute al =
        let pids =
          spawn_many !ncores ~in_subprocess:(fun i ->
 	   init i; (* call initialization function *)
-	   Pervasives.at_exit finalize; (* register finalization function *)
+	   Stdlib.at_exit finalize; (* register finalization function *)
            let d=Unix.gettimeofday()  in
            (* primitives for communication *)
            Unix.close pipeup_rd;

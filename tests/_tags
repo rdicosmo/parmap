@@ -1,1 +1,1 @@
-<*>: package(unix), package(bigarray), package(setcore), package(bytearray), package(mmap), package(parmap)
+<*>: package(unix), package(bigarray), package(setcore), package(bytearray), package(mmap), package(stdlib-shims), package(parmap)

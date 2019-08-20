@@ -28,6 +28,7 @@ depends: [
   "setcore"
   "bytearray"
   "mmap"
+  "stdlib-shims"
 ]
 synopsis: "Minimalistic library allowing to exploit multicore architecture"
 description: """

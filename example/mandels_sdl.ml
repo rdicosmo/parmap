@@ -33,7 +33,7 @@ let ofy = ref 0.;;
 
 (* convert an integer in the range 0..res into a screen color *)
 
-let color_of c res = Pervasives.truncate 
+let color_of c res = Stdlib.truncate 
       (((float c)/.(float res))*.(float Graphics.white));;
 
 (* compute the color of a pixel by iterating z_n+1=z_n^2+c *)
