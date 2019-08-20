@@ -1,6 +1,6 @@
 name = "parmap"
 version = "1.0-rc1"
 description = "Parallel map primitive for multicores"
-requires = "bigarray unix setcore bytearray"
+requires = "bigarray unix setcore bytearray mmap"
 archive(byte) = "parmap.cma"
 archive(native) = "parmap.cmxa"
