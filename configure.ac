@@ -34,5 +34,3 @@ else
   AC_OUTPUT
   mv Makefile_3.11 Makefile
 fi
-
-
