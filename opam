@@ -7,7 +7,6 @@ bug-reports: "https://github.com/rdicosmo/parmap/issues"
 build: [
   ["aclocal" "-I" "m4"]
   ["autoconf"]
-  ["autoheader"]
   ["./configure"] 
   [make "DESTDIR=%{prefix}%" "OCAMLLIBDIR=lib" ]
 ]
@@ -17,7 +16,6 @@ install: [
 remove: [
   ["aclocal" "-I" "m4"]
   ["autoconf"]
-  ["autoheader"]
   ["./configure"] 
   [make "uninstall" "DESTDIR=%{prefix}%" "OCAMLLIBDIR=lib"]
 ]
