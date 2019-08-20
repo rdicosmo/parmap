@@ -106,11 +106,13 @@ let redirect ?(path = (Printf.sprintf "/tmp/.parmap.%d" (Unix.getpid ()))) ~id =
       reopen_out stdout path (Printf.sprintf "stdout.%d" id);
       reopen_out stderr path (Printf.sprintf "stderr.%d" id);;
 
+let map_file fd kind layout shared dim =
+  Bigarray.array1_of_genarray
+    (Mmap.V1.map_file fd kind layout shared [|dim|])
+
 (* unmarshal from a mmap seen as a bigarray *)
 let unmarshal fd =
-  let a =
-    Bigarray.array1_of_genarray
-      (Mmap.V1.map_file fd Bigarray.char Bigarray.c_layout true [|-1|]) in
+  let a = map_file fd Bigarray.char Bigarray.c_layout true (-1) in
   let res = Bytearray.unmarshal a 0 in
   Unix.close fd;
   res
@@ -624,8 +626,7 @@ type buf=
 let init_shared_buffer a =
   let size = Array.length a in
   let fd = Utils.tempfd() in
-  let arr =
-    Bigarray.Array1.map_file fd Bigarray.float64 Bigarray.c_layout true size in
+  let arr = map_file fd Bigarray.float64 Bigarray.c_layout true size in
 
   (* The mmap() function shall add an extra reference to the file associated
      with the file descriptor fildes which is not removed by a subsequent
