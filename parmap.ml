@@ -108,11 +108,12 @@ let redirect ?(path = (Printf.sprintf "/tmp/.parmap.%d" (Unix.getpid ()))) ~id =
 
 (* unmarshal from a mmap seen as a bigarray *)
 let unmarshal fd =
- let a =
-   Bigarray.Array1.map_file fd Bigarray.char Bigarray.c_layout true (-1) in
- let res = Bytearray.unmarshal a 0 in
- Unix.close fd;
- res
+  let a =
+    Bigarray.array1_of_genarray
+      (Mmap.V1.map_file fd Bigarray.char Bigarray.c_layout true [|-1|]) in
+  let res = Bytearray.unmarshal a 0 in
+  Unix.close fd;
+  res
 
 (* marshal to a mmap seen as a bigarray *)
 

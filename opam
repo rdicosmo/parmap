@@ -27,6 +27,9 @@ depends: [
   "ocamlbuild" {build}
   "conf-autoconf"
   "conf-aclocal"
+  "setcore"
+  "bytearray"
+  "mmap"
 ]
 synopsis: "Minimalistic library allowing to exploit multicore architecture"
 description: """
