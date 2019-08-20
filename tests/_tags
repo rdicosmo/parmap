@@ -1,3 +1,3 @@
-<*>: package(unix), package(bigarray), package(parmap)
+<*>: package(unix), package(bigarray), package(setcore), package(parmap)
 
 
