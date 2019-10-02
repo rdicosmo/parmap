@@ -1,6 +1,7 @@
 log*
 *~
 _build
+parmap_compat.ml
 Makefile
 config.h
 config.log
