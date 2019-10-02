@@ -110,7 +110,7 @@ let redirect ?(path = (Printf.sprintf "/tmp/.parmap.%d" (Unix.getpid ()))) ~id =
 let unmarshal fd =
  let a =
    Bigarray.array1_of_genarray @@
-   Parmap_compat.map_file fd Bigarray.char Bigarray.c_layout true [|~-1|] in
+   Parmap_compat.map_file fd Bigarray.char Bigarray.c_layout true [|-1|] in
  let res = Bytearray.unmarshal a 0 in
  Unix.close fd;
  res
