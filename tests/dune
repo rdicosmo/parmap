@@ -1,0 +1,15 @@
+(library
+ (name utils)
+ (modules utils)
+ (flags
+  (:standard -w -35-27))
+ (libraries parmap))
+
+(tests
+ (names floatscale simplescale simplescale_array simplescalefold
+   simplescalemapfold)
+ (modules floatscale simplescale simplescale_array simplescalefold
+   simplescalemapfold)
+ (flags
+  (:standard -w -35-27))
+ (libraries utils parmap))

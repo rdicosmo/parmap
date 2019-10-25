@@ -1,4 +1,4 @@
-#include "config.h"
+#include "setcore_stubs.h"
 #if HAVE_MACH_THREAD_POLICY_H
 #include <mach/mach_init.h>
 #include <mach/thread_policy.h>
