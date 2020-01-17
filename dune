@@ -5,6 +5,11 @@
  (libraries bigarray unix)
  (c_names bytearray_stubs setcore_stubs))
 
+(documentation
+  (package parmap)
+  (mld_files index)
+)
+
 (rule
  (targets parmap_compat.ml setcore_stubs.h)
  (deps

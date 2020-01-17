@@ -16,3 +16,6 @@ test:
 
 clean:
 	$(DUNE) clean
+
+doc:
+	$(DUNE) build @doc $(DUNE_ARGS)
