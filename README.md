@@ -119,3 +119,19 @@ The `array_float_parmap` performs steps 1, 2, 4 and 5. It is possible to share s
 array and the shared memory buffer, and passing them as optional parameters to the
 `array_float_parmap` function: this may save a significant amount of time if the
 array is very large.
+
+## Install 
+
+### With opam
+
+```
+opam install parmap
+```
+
+### From source
+
+```
+make
+make install
+make test
+```
