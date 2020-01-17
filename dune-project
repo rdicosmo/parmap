@@ -1,5 +1,7 @@
 (lang dune 1.10)
 
+(name parmap)
+
 (generate_opam_files true)
 
 (license "LGPL-2.1-or-later WITH OCaml-LGPL-linking-exception")
@@ -21,6 +23,6 @@
    "Parmap is a minimalistic library allowing to exploit multicore\narchitecture for OCaml programs with minimal modifications: if you\nwant to use your many cores to accelerate an operation which happens\nto be a map, fold or map/fold (map-reduce), just use Parmap\226\128\153s parmap,\nparfold and parmapfold primitives in place of the standard List.map\nand friends, and specify the number of subprocesses to use by the\noptional parameter ~ncores.")
  (depends
   dune
-  dune.configurator
+  dune-configurator
   (ocaml
    (>= 4.02.3))))

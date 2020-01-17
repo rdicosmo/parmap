@@ -3,4 +3,3 @@ log*
 _build
 .merlin
 parmap.install
-parmap.opam
