@@ -14,3 +14,5 @@ install:
 test:
 	$(DUNE) runtest $(DUNE_ARGS)
 
+clean:
+	$(DUNE) clean
