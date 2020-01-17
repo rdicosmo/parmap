@@ -13,6 +13,6 @@
 (rule
  (targets parmap_compat.ml setcore_stubs.h)
  (deps
-  (:discover config/discover.exe))
+  (:discover ../config/discover.exe))
  (action
   (run %{discover})))
