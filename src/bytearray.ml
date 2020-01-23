@@ -36,7 +36,7 @@ let unsafe_blit_to_string a i s j l =
 *)
 
 external unsafe_blit_from_string : string -> int -> t -> int -> int -> unit
-  = "ml_blit_string_to_bigarray" "noalloc"
+  = "ml_blit_string_to_bigarray" [@@noalloc]
 (*
 external unsafe_blit_to_bytes : t -> int -> bytes -> int -> int -> unit
   = "ml_blit_bigarray_to_string" "noalloc"
@@ -107,10 +107,10 @@ external unmarshal : t -> int -> 'a
   = "ml_unmarshal_from_bigarray"
 
 external unsafe_blit_from_floatarray : float array -> int -> tf -> int -> int -> unit
-  = "ml_blit_floatarray_to_bigarray" "noalloc"
+  = "ml_blit_floatarray_to_bigarray" [@@noalloc]
 
 external unsafe_blit_to_floatarray : tf -> int -> float array -> int -> int -> unit
-  = "ml_blit_bigarray_to_floatarray" "noalloc"
+  = "ml_blit_bigarray_to_floatarray" [@@noalloc]
 
 let to_floatarray a l =
   let fa = Obj.obj (Obj.new_block Obj.double_array_tag l) in

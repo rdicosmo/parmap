@@ -33,7 +33,7 @@ let ofy = ref 0.;;
 
 (* convert an integer in the range 0..res into a screen color *)
 
-let color_of c res = Pervasives.truncate 
+let color_of c res = truncate
       (((float c)/.(float res))*.(float Graphics.white));;
 
 (* compute the color of a pixel by iterating z_n+1=z_n^2+c *)
@@ -47,7 +47,7 @@ let pixel (j,k,n) =
   let zrs = ref 0.0 in
   let zis = ref 0.0 in
   let d   = ref (2.0 /. ((float  n) -. 1.0)) in
-  let colour = Array.create n (Graphics.black) in
+  let colour = Array.make n (Graphics.black) in
 
   for s = 0 to (n-1) do
     let j1 = ref (((float  j.(s)) +. !ofx) /. !scale) in
@@ -84,7 +84,7 @@ let initsegm n =
 ;;
 
 let tasks = 
-  let ini = Array.create !n 0 in
+  let ini = Array.make !n 0 in
   let iniv = 
     for i=0 to (!n-1) do
       Array.set ini i i

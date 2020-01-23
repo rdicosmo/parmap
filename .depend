@@ -1,6 +1,0 @@
-bytearray.cmo: bytearray.cmi
-bytearray.cmx: bytearray.cmi
-parmap.cmo: bytearray.cmi parmap.cmi
-parmap.cmx: bytearray.cmx parmap.cmi
-bytearray.cmi:
-parmap.cmi:

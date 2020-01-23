@@ -1,4 +1,4 @@
-(* simple exemple to show how to use Parmap on the native toplevel *)
+(* simple example to show how to use Parmap on the native toplevel *)
 (* just run ocamlnat and then #use this file *)
 #load "unix.cmxs";;
 #load "bigarray.cmxs";;
