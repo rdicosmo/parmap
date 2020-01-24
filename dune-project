@@ -24,5 +24,7 @@
  (depends
   dune
   dune-configurator
+  base-bigarray
+  base-unix
   (ocaml
    (>= 4.02.3))))
