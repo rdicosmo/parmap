@@ -1,6 +1,5 @@
 (executable
  (name mandels)
- (public_name ocaml-parmap-mandels)
  (modules mandels)
  (flags
   (:standard -w -3-27))
