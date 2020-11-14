@@ -29,6 +29,8 @@ CAMLprim value setcore(value which) {
 #endif
   int retcode;
   int finished=0;
+  if (numcores <= 1) // only one core in the system, no need to attempt pinning
+    return Val_unit;
   while (finished==0)
     {
 #if HAVE_DECL_SCHED_SETAFFINITY
