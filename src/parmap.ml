@@ -393,7 +393,229 @@ let mapper (init:int -> unit) (finalize:unit -> unit) ncores' ~chunksize compute
        (* collect all results *)
        collect !res
   end
+    
+(* variant for lists: parametric mapper primitive that captures the parallel structure, preserves order *)
+let mapper_list (init:int -> unit) (finalize:unit -> unit) ncores' ~chunksize compute opid al collect =
+  let ln = Array.length al in
+  if ln=0 then (collect []) else
+  begin
+   set_ncores (min ln (max 1 ncores'));
+   log_debug "mapper on %d elements, on %d cores%!" ln !ncores;
+   match chunksize with
+     None ->
+       (* no need of load balancing *)
+       simplemapper init finalize !ncores compute opid al collect
+   | Some v when !ncores >= ln/v ->
+       (* no need of load balancing if more cores than tasks *)
+       simplemapper init finalize !ncores compute opid al collect
+   | Some v ->
+       (* init task parameters : ntasks > 0 here,
+          as otherwise ncores >= 1 >= ln/v = ntasks and we would take
+          the branch above *)
+       let chunksize = v and ntasks = ln/v in
+       (* flush everything *)
+       flush_all ();
+       (* create descriptors to mmap *)
+       let fdarr=Array.init !ncores (fun _ -> Utils.tempfd()) in
+       (* setup communication channel with the workers *)
+       let pipedown=Array.init !ncores (fun _ -> Unix.pipe ()) in
+       let pipeup_rd,pipeup_wr=Unix.pipe () in
+       let oc_up = Unix.out_channel_of_descr pipeup_wr in
+       (* run children *)
+       let pids =
+         spawn_many !ncores ~in_subprocess:(fun i ->
+	   init i; (* call initialization function *)
+	   at_exit finalize; (* register finalization function *)
+           let d=Unix.gettimeofday()  in
+           (* primitives for communication *)
+           Unix.close pipeup_rd;
+           let receive,signal,return,finish,pid =
+             setup_children_chans oc_up pipedown ~fdarr i in
+           let reschunk=ref opid in
+	   let resorder=ref [] in
+           let computetask n = (* compute chunk number n *)
+             let lo=n*chunksize in
+             let hi=if n=ntasks-1 then ln-1 else (n+1)*chunksize-1 in
+             let exc_handler e j = (* handle an exception at index j *)
+               begin
+                 let errmsg = Printexc.to_string e in
+                 Utils.log_error
+                   "error at index j=%d in (%d,%d), chunksize=%d of a \
+                    total of %d got exception %s on core %d \n%!"
+         	   j lo hi chunksize (hi-lo+1) errmsg i;
+                 signal (Error (i,errmsg): msg_to_master);
+                 finish()
+               end
+             in
+             reschunk:= compute al lo hi !reschunk exc_handler;
+	     resorder:= lo::(!resorder);
+             log_debug
+               "worker on core %d (pid=%d), segment (%d,%d) of data of \
+                length %d, chunksize=%d finished in %f seconds"
+               i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
+           in
+           while true do
+             (* ask for work until we are finished *)
+             signal (Ready i);
+             match receive() with
+             | Finished -> return ((!reschunk:'d),!resorder); finish ()
+             | Task n -> computetask n
+           done)
+       in
 
+       (* close unused ends of the pipes *)
+       Array.iter (fun (rfd,_) -> Unix.close rfd) pipedown;
+       Unix.close pipeup_wr;
+
+       (* get ic/oc/wfdl *)
+       let ocs=
+         Array.init !ncores
+           (fun n -> Unix.out_channel_of_descr (snd pipedown.(n))) in
+       let ic=Unix.in_channel_of_descr pipeup_rd in
+
+       (* feed workers until all tasks are finished *)
+       for i=0 to ntasks-1 do
+         match Marshal.from_channel ic with
+           Ready w ->
+             (log_debug "sending task %d to worker %d" i w;
+              let oc = ocs.(w) in
+              (Marshal.to_channel oc (Task i) []); flush oc)
+         | (Error (core,msg): msg_to_master) -> handle_exc core msg
+       done;
+
+       (* send termination token to all children *)
+       Array.iter (fun oc ->
+         Marshal.to_channel oc Finished [];
+         flush oc;
+         close_out oc
+       ) ocs;
+
+       (* wait for all children to terminate *)
+       wait_for_pids pids;
+
+       (* read in all data *)
+       let res = ref [] in
+       (* iterate in reverse order, to accumulate in the right order *)
+       for i = 0 to !ncores-1 do
+         res:= ((unmarshal fdarr.((!ncores-1)-i)):'d * (int list))::!res;
+       done;
+       (* collect all results *)
+       let restagged=List.flatten(List.map (fun (rl,ol) -> List.map2 (fun r i -> (i,r)) rl ol) !res) in
+       let restagged'=List.map snd (List.stable_sort (fun (n,_) (m,_) -> m-n) restagged)
+       in collect [restagged']
+  end
+
+(* variant for arrays: parametric mapper primitive that captures the parallel structure, preserves order *)
+let mapper_array (init:int -> unit) (finalize:unit -> unit) ncores' ~chunksize compute opid al collect =
+  let ln = Array.length al in
+  if ln=0 then (collect []) else
+  begin
+   set_ncores (min ln (max 1 ncores'));
+   log_debug "mapper on %d elements, on %d cores%!" ln !ncores;
+   match chunksize with
+     None ->
+       (* no need of load balancing *)
+       simplemapper init finalize !ncores compute opid al collect
+   | Some v when !ncores >= ln/v ->
+       (* no need of load balancing if more cores than tasks *)
+       simplemapper init finalize !ncores compute opid al collect
+   | Some v ->
+       (* init task parameters : ntasks > 0 here,
+          as otherwise ncores >= 1 >= ln/v = ntasks and we would take
+          the branch above *)
+       let chunksize = v and ntasks = ln/v in
+       (* flush everything *)
+       flush_all ();
+       (* create descriptors to mmap *)
+       let fdarr=Array.init !ncores (fun _ -> Utils.tempfd()) in
+       (* setup communication channel with the workers *)
+       let pipedown=Array.init !ncores (fun _ -> Unix.pipe ()) in
+       let pipeup_rd,pipeup_wr=Unix.pipe () in
+       let oc_up = Unix.out_channel_of_descr pipeup_wr in
+       (* run children *)
+       let pids =
+         spawn_many !ncores ~in_subprocess:(fun i ->
+	   init i; (* call initialization function *)
+	   at_exit finalize; (* register finalization function *)
+           let d=Unix.gettimeofday()  in
+           (* primitives for communication *)
+           Unix.close pipeup_rd;
+           let receive,signal,return,finish,pid =
+             setup_children_chans oc_up pipedown ~fdarr i in
+           let reschunk=ref opid in
+	   let resorder=ref [] in
+           let computetask n = (* compute chunk number n *)
+             let lo=n*chunksize in
+             let hi=if n=ntasks-1 then ln-1 else (n+1)*chunksize-1 in
+             let exc_handler e j = (* handle an exception at index j *)
+               begin
+                 let errmsg = Printexc.to_string e in
+                 Utils.log_error
+                   "error at index j=%d in (%d,%d), chunksize=%d of a \
+                    total of %d got exception %s on core %d \n%!"
+         	   j lo hi chunksize (hi-lo+1) errmsg i;
+                 signal (Error (i,errmsg): msg_to_master);
+                 finish()
+               end
+             in
+             reschunk:= compute al lo hi !reschunk exc_handler;
+	     resorder:= lo::(!resorder);
+             log_debug
+               "worker on core %d (pid=%d), segment (%d,%d) of data of \
+                length %d, chunksize=%d finished in %f seconds"
+               i pid lo hi ln chunksize (Unix.gettimeofday() -. d)
+           in
+           while true do
+             (* ask for work until we are finished *)
+             signal (Ready i);
+             match receive() with
+             | Finished -> return ((!reschunk:'d),!resorder); finish ()
+             | Task n -> computetask n
+           done)
+       in
+
+       (* close unused ends of the pipes *)
+       Array.iter (fun (rfd,_) -> Unix.close rfd) pipedown;
+       Unix.close pipeup_wr;
+
+       (* get ic/oc/wfdl *)
+       let ocs=
+         Array.init !ncores
+           (fun n -> Unix.out_channel_of_descr (snd pipedown.(n))) in
+       let ic=Unix.in_channel_of_descr pipeup_rd in
+
+       (* feed workers until all tasks are finished *)
+       for i=0 to ntasks-1 do
+         match Marshal.from_channel ic with
+           Ready w ->
+             (log_debug "sending task %d to worker %d" i w;
+              let oc = ocs.(w) in
+              (Marshal.to_channel oc (Task i) []); flush oc)
+         | (Error (core,msg): msg_to_master) -> handle_exc core msg
+       done;
+
+       (* send termination token to all children *)
+       Array.iter (fun oc ->
+         Marshal.to_channel oc Finished [];
+         flush oc;
+         close_out oc
+       ) ocs;
+
+       (* wait for all children to terminate *)
+       wait_for_pids pids;
+
+       (* read in all data *)
+       let res = ref [] in
+       (* iterate in reverse order, to accumulate in the right order *)
+       for i = 0 to !ncores-1 do
+         res:= ((unmarshal fdarr.((!ncores-1)-i)):'d * (int list))::!res;
+       done;
+       (* collect all results *)
+       let restagged=List.flatten(List.map (fun (rl,ol) -> List.map2 (fun r i -> (i,r)) rl ol) !res) in
+       let restagged'=List.map snd (List.stable_sort (fun (n,_) (m,_) -> m-n) restagged)
+       in collect [restagged']
+  end
+    
 (* parametric iteration primitive that captures the parallel structure *)
 let geniter init finalize ncores' ~chunksize compute al =
   let ln = Array.length al in
@@ -547,7 +769,7 @@ let parmapi
 	| n ->  aux ((f' n)::acc) (n-1)
     in aux previous (hi-lo)
   in
-  mapper init finalize ncores ~chunksize compute [] al  (fun r -> Utils.concat_tr r)
+  mapper_list init finalize ncores ~chunksize compute [] al  (fun r -> Utils.concat_tr r)
 
 let parmap ?init ?finalize ?ncores ?chunksize (f:'a -> 'b) (s:'a sequence) : 'b list=
     parmapi ?init ?finalize ?ncores ?chunksize (fun _ x -> f x) s
@@ -590,7 +812,7 @@ let array_parmapi
       Array.concat [(mapi_range lo hi f a);previous]
     with e -> exc_handler e lo
   in
-  mapper init finalize ncores ~chunksize compute [||] al  (fun r -> Array.concat r)
+  mapper_array init finalize ncores ~chunksize compute [||] al  (fun r -> Array.concat r)
 
 let array_parmap ?init ?finalize ?ncores ?chunksize (f:'a -> 'b) (al:'a array) : 'b array=
   array_parmapi ?init ?finalize ?ncores ?chunksize (fun _ x -> f x) al
