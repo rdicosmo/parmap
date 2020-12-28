@@ -56,7 +56,7 @@ let array_scale_test ?(init= (fun _ -> ())) ?(inorder=true) ?(step=1) ?chunksize
     let tot=ref 0.0 in
     for j=1 to iter do
       let d=Unix.gettimeofday() in
-      let rpar=array_parmap ~init ~ncores:i compute a in
+      let rpar=array_parmap ~init ~ncores:i ?chunksize compute a in
       tot:=!tot+.(Unix.gettimeofday()-.d);
       if rseq<>rpar then 
 	begin

@@ -30,10 +30,12 @@ let fcompute p =
 ;;
 
 array_scale_test fcompute (Array.init 20000 (fun i -> float_of_int i)) 2 1 10;;
+array_scale_test ~chunksize:100 fcompute (Array.init 20000 (fun i -> float_of_int i)) 2 1 10;;
 
+(*
 array_float_scale_test fcompute (Array.init 20000 (fun i -> float_of_int i)) 2 1 10;;
 
 scale_test ~chunksize:100 ~inorder:false compute (A (Array.init 20000 (fun i -> i))) 2 1 10;;
 
 scale_test compute (A (Array.init 20000 (fun i -> i))) 2 1 10;;
-
+*)
