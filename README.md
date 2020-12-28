@@ -65,16 +65,20 @@ need to load the `.cmxs` modules in it; an example is given in `example/topnat.m
 If the number of chunks is equal to the number of cores, it is easy to preserve
 the order of the elements of the sequence passed to the map/fold operations, so
 the result will be a list with the same order as if the sequential function would
-be applied to the input. This is what the `parmap`, `parmafold` and `parfold` functions
+be applied to the input. This is what the `parmap`, `parmapfold` and `parfold` functions
 do when the chunksize argument is not used.
 
 If the user specifies a chunksize that is different from the number of cores,
-there is no general way to preserve the ordering, so the result of calling
-`Parmap.parmap f l` are not necessarily in the same order as `List.map f l`.
+the current implementation for `parmap`, `parmapi`, `array_parmap` and
+`array_parmapi` tags the chunks and reorders them at the end, so the result of
+calling `Parmap.parmap f l` is the same as `List.map f l`. No reordering logic
+is implemented for `parmapfold`, `parfold` and their variants, as performing
+these operations in parallel only make sense if the order is irrelevant.
 
-In general, using little chunksize helps in balancing the load among the workers,
-and provides better speed, at the price of losing the ordering: there is a
-tradeoff, and it is up to the user to choose the solution that better suits him/her.
+In general, using little chunksize helps in balancing the load among the
+workers, and provides better speed, but incurs a little overhead for tagging and
+reordering the chunks: there is a tradeoff, and it is up to the user to choose
+the solution that better suits him/her.
 
 ## Fast map on arrays and on float arrays
 
@@ -103,7 +107,7 @@ function must perform.
         - : float = 0.0501301288604736328
     ```
 
- 2. create a shared memory area ,
+ 2. create a shared memory area,
 
  3. possibly copy the result array to the shared memory area,
 

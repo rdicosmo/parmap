@@ -119,8 +119,8 @@ val parmap : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?
       If the optional [chunksize] parameter is specified,
       the processes compute the result in an on-demand fashion
       on blocks of size [chunksize]; this provides automatic
-      load balancing for unbalanced computations, but the order
-      of the result is no longer guaranteed to be preserved. *)
+      load balancing for unbalanced computations, preserving
+      the order of the results. *)
 
 (** {3 Parallel iteration} *)
 
@@ -160,8 +160,8 @@ val array_parmap : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:in
       If the optional [chunksize] parameter is specified,
       the processes compute the result in an on-demand fashion
       on blochs of size [chunksize]; this provides automatic
-      load balancing for unbalanced computations, but the order
-      of the result is no longer guaranteed to be preserved. *)
+      load balancing for unbalanced computations, preserving
+      the order of the results. *)
 
 (** {3 Parallel map on arrays, indexed} *)
 
@@ -189,7 +189,7 @@ val array_float_parmap : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?nco
       optional [chunksize] parameter is specified, the processes compute the
       result in an on-demand fashion on blochs of size [chunksize]; this
       provides automatic load balancing for unbalanced computations, *and* the
-      order of the result is still guaranteed to be preserved.
+      order of the result is guaranteed to be preserved.
 
       In case you already have at hand an array where to store the result, you
       can squeeze out some more cpu cycles by passing it as optional parameter
