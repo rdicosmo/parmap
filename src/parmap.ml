@@ -526,6 +526,17 @@ let parmapfold
 
 (* the parallel map function *)
 
+    let mapi_range lo hi (f:int -> 'a -> 'b) a =
+  let l = hi-lo in
+  if l < 0 then [||] else begin
+    let r = Array.make (l+1) (f lo (Array.unsafe_get a lo)) in
+    for i = 1 to l do
+      let idx = lo+i in
+      Array.unsafe_set r i (f idx (Array.unsafe_get a idx))
+    done;
+    r
+  end
+
 let parmapi
     ?(init = fun _ -> ())
     ?(finalize = fun () -> ())
@@ -535,7 +546,18 @@ let parmapi
     (s:'a sequence) : 'b list=
   (* enforce array to speed up access to the list elements *)
   let al = match s with A al -> al | L l  -> Array.of_list l in
-  let compute al lo hi previous exc_handler =
+  (* compute, collect and opid definitions for reordering after load balancing *)
+  let compute_sorted a lo hi previous exc_handler =
+    try
+      (lo,mapi_range lo hi f a)::previous
+    with e -> exc_handler e lo
+  and collect_sorted (r:(int * 'b array) list list) =
+    let fragments = List.flatten r in
+    let ordered=List.map snd (List.stable_sort (fun (n,_) (m,_) -> n-m) fragments) in
+    Array.to_list (Array.concat ordered)
+  and opid_sorted = [(0,[||])]
+  (* compute, collect and opid definitions without reordering *)
+  and compute al lo hi previous exc_handler =
     (* iterate in reverse order, to accumulate in the right order,
        and add to acc *)
     let f' j =
@@ -546,8 +568,18 @@ let parmapi
 	  0 ->  (f' 0)::acc
 	| n ->  aux ((f' n)::acc) (n-1)
     in aux previous (hi-lo)
-  in
-  mapper init finalize ncores ~chunksize compute [] al  (fun r -> Utils.concat_tr r)
+  and collect r = Utils.concat_tr r
+  and opid = [] in
+  let ln = Array.length al in
+  match chunksize with
+    None ->
+      (* no need of load balancing *)
+      mapper init finalize ncores ~chunksize compute opid al collect
+  | Some v when ncores >= ln/v ->
+      (* no need of load balancing if more cores than tasks *)
+      mapper init finalize ncores ~chunksize compute opid al collect
+  | Some _ ->
+      mapper init finalize ncores ~chunksize compute_sorted opid_sorted al collect_sorted
 
 let parmap ?init ?finalize ?ncores ?chunksize (f:'a -> 'b) (s:'a sequence) : 'b list=
     parmapi ?init ?finalize ?ncores ?chunksize (fun _ x -> f x) s
@@ -566,17 +598,6 @@ let parfold
     parmapfold ~init ~finalize ~ncores ?chunksize (fun x -> x) s op opid concat
 
 (* the parallel map function, on arrays *)
-
-let mapi_range lo hi (f:int -> 'a -> 'b) a =
-  let l = hi-lo in
-  if l < 0 then [||] else begin
-    let r = Array.make (l+1) (f lo (Array.unsafe_get a lo)) in
-    for i = 1 to l do
-      let idx = lo+i in
-      Array.unsafe_set r i (f idx (Array.unsafe_get a idx))
-    done;
-    r
-  end
 
 let array_parmapi
     ?(init = fun _ -> ())
@@ -610,7 +631,7 @@ let array_parmapi
   | Some v when ncores >= ln/v ->
       (* no need of load balancing if more cores than tasks *)
       mapper init finalize ncores ~chunksize compute opid al collect
-  | Some v ->
+  | Some _ ->
       mapper init finalize ncores ~chunksize compute_sorted opid_sorted al collect_sorted
 
 let array_parmap ?init ?finalize ?ncores ?chunksize (f:'a -> 'b) (al:'a array) : 'b array=
