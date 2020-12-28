@@ -585,12 +585,33 @@ let array_parmapi
     ?chunksize
     (f:int -> 'a -> 'b)
     (al:'a array) : 'b array=
-  let compute a lo hi previous exc_handler =
+  (* compute, collect and opid definitions for reordering after load balancing *)
+  let compute_sorted a lo hi previous exc_handler =
+    try
+      (lo,mapi_range lo hi f a)::previous
+    with e -> exc_handler e lo
+  and collect_sorted (r:(int * 'b array) list list) =
+    let fragments = List.flatten r in
+    let ordered=List.map snd (List.stable_sort (fun (n,_) (m,_) -> n-m) fragments) in
+    Array.concat ordered
+  and opid_sorted = [(0,[||])]
+  (* compute, collect and opid definitions without reordering *)
+  and compute a lo hi previous exc_handler =
     try
       Array.concat [(mapi_range lo hi f a);previous]
     with e -> exc_handler e lo
-  in
-  mapper init finalize ncores ~chunksize compute [||] al  (fun r -> Array.concat r)
+  and collect r = Array.concat r
+  and opid = [||] in
+  let ln = Array.length al in
+  match chunksize with
+    None ->
+      (* no need of load balancing *)
+      mapper init finalize ncores ~chunksize compute opid al collect
+  | Some v when ncores >= ln/v ->
+      (* no need of load balancing if more cores than tasks *)
+      mapper init finalize ncores ~chunksize compute opid al collect
+  | Some v ->
+      mapper init finalize ncores ~chunksize compute_sorted opid_sorted al collect_sorted
 
 let array_parmap ?init ?finalize ?ncores ?chunksize (f:'a -> 'b) (al:'a array) : 'b array=
   array_parmapi ?init ?finalize ?ncores ?chunksize (fun _ x -> f x) al
