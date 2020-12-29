@@ -70,10 +70,18 @@ do when the chunksize argument is not used.
 
 If the user specifies a chunksize that is different from the number of cores,
 the current implementation for `parmap`, `parmapi`, `array_parmap` and
-`array_parmapi` tags the chunks and reorders them at the end, so the result of
-calling `Parmap.parmap f l` is the same as `List.map f l`. No reordering logic
-is implemented for `parmapfold`, `parfold` and their variants, as performing
-these operations in parallel only make sense if the order is irrelevant.
+`array_parmapi` by default does not guarantee the preservation of the order
+of the results. If the `keeporder` parameter is set to true, an alternative
+implementation is used, that tags the chunks and reorders them at the end, so the result of
+calling `Parmap.parmap f l` is the same as `List.map f l`. Depending on the
+nature of your workload (in particular, number of chunks and size of the results),
+this may be way more efficient than implementing a sorting mechanism yourself, but
+may also end up using up to twice the space and time of the default implementation:
+there is a tradeoff, and it is up to the user to choose the solution that better suits him/her.
+
+No reordering logic is implemented for `parmapfold`, `parfold` and their
+variants, as performing these operations in parallel only make sense if the
+order is irrelevant.
 
 In general, using little chunksize helps in balancing the load among the
 workers, and provides better speed, but incurs a little overhead for tagging and
