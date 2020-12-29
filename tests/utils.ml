@@ -12,7 +12,7 @@
 
 open Parmap
 
-let scale_test ?(init=(fun _ -> ())) ?(inorder=true) ?(step=1) ?chunksize compute sequence iter nprocmin nprocmax =
+let scale_test ?(init=(fun _ -> ())) ?(inorder=true) ?(step=1) ?chunksize ?(keeporder=false) compute sequence iter nprocmin nprocmax =
   Printf.eprintf "Testing scalability with %d iterations on %d to %d cores, step %d\n%!" iter nprocmin nprocmax step;
   let rseq,tseq =  
     let d=Unix.gettimeofday() in
@@ -26,14 +26,14 @@ let scale_test ?(init=(fun _ -> ())) ?(inorder=true) ?(step=1) ?chunksize comput
     let tot=ref 0.0 in
     for j=1 to iter do
       let d=Unix.gettimeofday() in
-      let rpar=parmap ~init ~ncores:i ?chunksize compute sequence in
+      let rpar=parmap ~init ~ncores:i ?chunksize ~keeporder compute sequence in
       tot:=!tot+.(Unix.gettimeofday()-.d);
       if rseq<>rpar then 
 	begin
 	  if (List.sort compare rseq) <> (List.sort compare rpar) then 
 	    Printf.eprintf "Parmap failure: result mismatch!\n%!"
 	  else
-	    if inorder then Printf.eprintf "Parmap failure: result order was expected to be preserved, and is not.\n%!"
+	    if inorder || keeporder then Printf.eprintf "Parmap failure: result order was expected to be preserved, and is not.\n%!"
 	    else Printf.eprintf "Parmap warning: result order is not preserved (it was not expected to be).\n%!"
 	end
     done;
@@ -43,7 +43,7 @@ let scale_test ?(init=(fun _ -> ())) ?(inorder=true) ?(step=1) ?chunksize comput
   rseq
 ;;
 
-let array_scale_test ?(init= (fun _ -> ())) ?(inorder=true) ?(step=1) ?chunksize compute a iter nprocmin nprocmax =
+let array_scale_test ?(init= (fun _ -> ())) ?(inorder=true) ?(step=1) ?chunksize ?(keeporder=false) compute a iter nprocmin nprocmax =
   Printf.eprintf "Testing scalability with %d iterations on %d to %d cores, step %d\n" iter nprocmin nprocmax step;
   let rseq,tseq =  
     let d=Unix.gettimeofday() in
@@ -56,14 +56,14 @@ let array_scale_test ?(init= (fun _ -> ())) ?(inorder=true) ?(step=1) ?chunksize
     let tot=ref 0.0 in
     for j=1 to iter do
       let d=Unix.gettimeofday() in
-      let rpar=array_parmap ~init ~ncores:i ?chunksize compute a in
+      let rpar=array_parmap ~init ~ncores:i ?chunksize ~keeporder compute a in
       tot:=!tot+.(Unix.gettimeofday()-.d);
       if rseq<>rpar then 
 	begin
 	  if (Array.sort compare rseq) <> (Array.sort compare rpar) then 
 	    Printf.eprintf "Parmap failure: result mismatch!\n"
 	  else
-	    if inorder then Printf.eprintf "Parmap failure: result order was expected to be preserved, and is not.\n"
+	    if inorder || keeporder then Printf.eprintf "Parmap failure: result order was expected to be preserved, and is not.\n"
 	    else Printf.eprintf "Parmap warning: result order is not preserved (it was not expected to be).\n"
 	end
     done;
