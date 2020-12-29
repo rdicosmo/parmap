@@ -105,13 +105,13 @@ val parfold: ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?
       function is only correct if [op] and [concat] are associative and commutative.
       If the optional [chunksize] parameter is specified,
       the processes compute the result in an on-demand fashion
-      on blocks of size [chunksize].
+      on blocks of size [chunksize]. 
       [parfold ~ncores:n op (A a) b concat] similarly computes [Array.fold_right op a b].
       *)
 
 (** {3 Parallel map} *)
 
-val parmap : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a sequence -> 'b list
+val parmap : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ?keeporder:bool-> ('a -> 'b) -> 'a sequence -> 'b list
   (** [parmap  ~ncores:n f (L l) ] computes [List.map f l]
       by forking [n] processes on a multicore machine.
       [parmap  ~ncores:n f (A a) ] computes [Array.map f a]
@@ -120,7 +120,7 @@ val parmap : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?
       the processes compute the result in an on-demand fashion
       on blocks of size [chunksize]; this provides automatic
       load balancing for unbalanced computations, preserving
-      the order of the results. *)
+      the order of the results if [keeporder] is set to true. *)
 
 (** {3 Parallel iteration} *)
 
@@ -142,7 +142,7 @@ val parmapifold : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int
 
 (** {3 Parallel map, indexed} *)
 
-val parmapi : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> (int -> 'a -> 'b) -> 'a sequence -> 'b list
+val parmapi : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ?keeporder:bool -> (int -> 'a -> 'b) -> 'a sequence -> 'b list
   (** Like parmap, but the map function gets as an extra argument
       the index of the mapped element *)
 
@@ -154,18 +154,18 @@ val pariteri : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int ->
 
 (** {3 Parallel map on arrays} *)
 
-val array_parmap : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ('a -> 'b) -> 'a array -> 'b array
+val array_parmap : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ?keeporder:bool -> ('a -> 'b) -> 'a array -> 'b array
   (** [array_parmap  ~ncores:n f a ] computes [Array.map f a]
       by forking [n] processes on a multicore machine.
       If the optional [chunksize] parameter is specified,
       the processes compute the result in an on-demand fashion
       on blochs of size [chunksize]; this provides automatic
       load balancing for unbalanced computations, preserving
-      the order of the results. *)
+      the order of the results if [keeporder] is set to true. *)
 
 (** {3 Parallel map on arrays, indexed} *)
 
-val array_parmapi : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> (int -> 'a -> 'b) -> 'a array -> 'b array
+val array_parmapi : ?init:(int -> unit) -> ?finalize:(unit -> unit) -> ?ncores:int -> ?chunksize:int -> ?keeporder:bool -> (int -> 'a -> 'b) -> 'a array -> 'b array
   (** Like array_parmap, but the map function gets as an extra argument
       the index of the mapped element *)
 

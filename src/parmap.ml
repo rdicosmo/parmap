@@ -558,6 +558,7 @@ let array_parmapi
     ?(finalize = fun () -> ())
     ?(ncores= !default_ncores)
     ?chunksize
+    ?(keeporder=false)
     (f:int -> 'a -> 'b)
     (al:'a array) : 'b array=
   (* compute, collect and opid definitions for reordering after load balancing *)
@@ -578,24 +579,29 @@ let array_parmapi
   and collect r = Array.concat r
   and opid = [||] in
   let ln = Array.length al in
-  match chunksize with
-    None ->
+  match keeporder, chunksize with
+  | _ , None ->
       (* no need of load balancing *)
       mapper init finalize ncores ~chunksize compute opid al collect
-  | Some v when ncores >= ln/v ->
+  | _ , Some v when ncores >= ln/v ->
       (* no need of load balancing if more cores than tasks *)
       mapper init finalize ncores ~chunksize compute opid al collect
-  | Some _ ->
+  | false , Some _ ->
+      (* load balancing without reordering *)
+      mapper init finalize ncores ~chunksize compute opid al collect
+  | true , Some _ ->
+      (* load balancing with reordering *)
       mapper init finalize ncores ~chunksize compute_sorted opid_sorted al collect_sorted
 
-let array_parmap ?init ?finalize ?ncores ?chunksize (f:'a -> 'b) (al:'a array) : 'b array=
-  array_parmapi ?init ?finalize ?ncores ?chunksize (fun _ x -> f x) al
+let array_parmap ?init ?finalize ?ncores ?chunksize ?keeporder (f:'a -> 'b) (al:'a array) : 'b array=
+  array_parmapi ?init ?finalize ?ncores ?chunksize ?keeporder (fun _ x -> f x) al
 
 let parmapi
     ?(init = fun _ -> ())
     ?(finalize = fun () -> ())
     ?(ncores= !default_ncores)
     ?chunksize
+    ?(keeporder=false)
     (f:int ->'a -> 'b)
     (s:'a sequence) : 'b list=
   (* enforce array to speed up access to the list elements *)
@@ -615,18 +621,22 @@ let parmapi
   and collect r = Utils.concat_tr r
   and opid = [] in
   let ln = Array.length al in
-  match chunksize with
-    None ->
+  match keeporder, chunksize with
+    _ , None ->
       (* no need of load balancing *)
       mapper init finalize ncores ~chunksize compute opid al collect
-  | Some v when ncores >= ln/v ->
+  | _ , Some v when ncores >= ln/v ->
       (* no need of load balancing if more cores than tasks *)
       mapper init finalize ncores ~chunksize compute opid al collect
-  | Some _ ->
-      Array.to_list (array_parmapi ~init ~finalize ~ncores ?chunksize f al)
+  | false , Some _ ->
+      (* load balancing without reordering *)
+      mapper init finalize ncores ~chunksize compute opid al collect
+  | true , Some _ ->
+      (* load balancing with reordering *)
+      Array.to_list (array_parmapi ~init ~finalize ~ncores ?chunksize ~keeporder f al)
 
-let parmap ?init ?finalize ?ncores ?chunksize (f:'a -> 'b) (s:'a sequence) : 'b list=
-    parmapi ?init ?finalize ?ncores ?chunksize (fun _ x -> f x) s
+let parmap ?init ?finalize ?ncores ?chunksize ?keeporder (f:'a -> 'b) (s:'a sequence) : 'b list=
+    parmapi ?init ?finalize ?ncores ?chunksize ?keeporder (fun _ x -> f x) s
 
     
 (* This code is highly optimised for operations on float arrays:
