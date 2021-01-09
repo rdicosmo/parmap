@@ -1,3 +1,10 @@
+2021/01/09 (RDC)
+        Major enhancement: add support for returning results in the right order from
+        the calls to parmap/parmapi/array_parmap/array_parmapi even when the
+	chunksize parameter is used. This can be accomplished using the keeporder
+	parameter.
+	Documentation, tests and functions parameters updated accordingly.
+
 2020/01/23 (RDC)
 	Integrated major rewriting of the build system, moving to dune;
 	dropped compatibility with pre-4.02 OCaml versions.
