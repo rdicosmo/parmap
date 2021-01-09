@@ -66,9 +66,12 @@ size <code>chunksize</code> of the tasks list.</p>
 
 <p>The library also provides highly efficient specialised functions for arrays of floats, as well as functions for iterating over a sequence.</p>
 <h2>Documentation</h2>
-<p>On top of <a href="doc/parmap/Parmap/index.html" name="Parmap Ocamldoc">the standard ocamldoc output</a>, you can read this <a href="http://www.sciencedirect.com/science/article/pii/S1877050912003237" name="Parmap article at ICCS 2012">research article presenting Parmap</a>:</p>
+<menu>
+<li> here is <a href="doc/parmap/Parmap/index.html" name="Parmap Ocamldoc">the complete documentation of the Parmap library</A> (using OCamlDoc);
+<li> you can also read this <a href="http://www.sciencedirect.com/science/article/pii/S1877050912003237" name="Parmap article at ICCS 2012">research article presenting Parmap</a>:</p>
 <menu>
 M. Danelutto, R. Di Cosmo, A “Minimal Disruption” Skeleton Experiment: Seamless Map &amp; Reduce Embedding in OCaml, Procedia Computer Science, Volume 9, 2012, Pages 1837-1846
+</menu>
 </menu>
 <h2>Development</h2>
 <menu>
@@ -146,13 +149,27 @@ the result will be a list with the same order as if the sequential function woul
 be applied to the input. This is what the parmap, parmafold and parfold functions
 do when the chunksize argument is not used.</p>
 
-<p>If the user specifies a chunksize that is different from the number of cores,
-there is no general way to preserve the ordering, so the result of calling
-Parmap.parmap f l are not necessarily in the same order as List.map f l.</p>
+<p>
+If the user specifies a chunksize that is different from the number of cores,
+the current implementation for parmap, parmapi, array_parmap and
+array_parmapi by default does not guarantee the preservation of the order
+of the results. If the keeporder parameter is set to true, an alternative
+implementation is used, that tags the chunks and reorders them at the end, so the result of
+calling Parmap.parmap f l is the same as List.map f l. Depending on the
+nature of your workload (in particular, number of chunks and size of the results),
+this may be way more efficient than implementing a sorting mechanism yourself, but
+may also end up using up to twice the space and time of the default implementation:
+there is a tradeoff, and it is up to the user to choose the solution that better suits him/her.</p>
 
-<p>In general, using little chunksize helps in balancing the load among the workers,
-and provides better speed, at the price of losing the ordering: there is a
-tradeoff, and it is up to the user to choose the solution that better suits him/her.</p>
+<p>No reordering logic is implemented for parmapfold, parfold and their
+variants, as performing these operations in parallel only make sense if the
+order is irrelevant.</p>
+
+<p>In general, using little chunksize helps in balancing the load among the
+workers, and provides better speed, but incurs a little overhead for tagging and
+reordering the chunks: there is a tradeoff, and it is up to the user to choose
+the solution that better suits him/her.</p>
+
 
 <h3>Fast map on arrays and on float arrays</h3>
 
