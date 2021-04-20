@@ -113,7 +113,7 @@ external unsafe_blit_to_floatarray : tf -> int -> float array -> int -> int -> u
   = "ml_blit_bigarray_to_floatarray" [@@noalloc]
 
 let to_floatarray a l =
-  let fa = Obj.obj (Obj.new_block Obj.double_array_tag l) in
+  let fa = Array.create_float l in
   unsafe_blit_to_floatarray a 0 fa 0 l;
   fa
 

@@ -27,4 +27,4 @@
   base-bigarray
   base-unix
   (ocaml
-   (>= 4.02.3))))
+   (>= 4.03.0))))
