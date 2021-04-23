@@ -27,7 +27,6 @@ let () =
     let ml_file = "parmap_compat.ml" in
     let pre_406 = [ "let map_file = Bigarray.Genarray.map_file" ] in
     let ml_code = match C.ocaml_config_var_exn c "version" with
-      | "4.02.3" -> pre_406
       | "4.03.0" -> pre_406
       | "4.04.0" -> pre_406
       | "4.04.1" -> pre_406
