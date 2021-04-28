@@ -3,7 +3,7 @@
  (synopsis "Parallel map primitive for multicores")
  (wrapped false)
  (libraries bigarray unix)
- (c_names bytearray_stubs setcore_stubs))
+ (foreign_stubs (language c) (names bytearray_stubs setcore_stubs)))
 
 (documentation
   (package parmap)
