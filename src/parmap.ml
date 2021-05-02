@@ -390,6 +390,8 @@ let mapper (init:int -> unit) (finalize:unit -> unit) ncores' ~chunksize compute
        for i = 0 to !ncores-1 do
          res:= ((unmarshal fdarr.((!ncores-1)-i)):'d)::!res;
        done;
+       (* close read pipe end *)
+       Unix.close pipeup_rd;
        (* collect all results *)
        collect !res
   end
