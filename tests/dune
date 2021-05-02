@@ -6,9 +6,9 @@
  (libraries parmap))
 
 (tests
- (names floatscale simplescale simplescale_array simplescalefold
+ (names testexceptions floatscale simplescale simplescale_array simplescalefold
    simplescalemapfold)
- (modules floatscale simplescale simplescale_array simplescalefold
+ (modules testexceptions floatscale simplescale simplescale_array simplescalefold
    simplescalemapfold)
  (flags
   (:standard -w -35-27))

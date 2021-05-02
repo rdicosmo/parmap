@@ -203,6 +203,7 @@ let simplemapper (init:int -> unit) (finalize: unit -> unit) ncores' compute opi
     ln !ncores chunksize;
   (* create descriptors to mmap *)
   let fdarr=Array.init !ncores (fun _ -> Utils.tempfd()) in
+  let statusfdarr=Array.init !ncores (fun _ -> Utils.tempfd()) in
   (* run children *)
   run_many !ncores ~in_subprocess:(fun i ->
     init i;  (* call initialization function *)
@@ -214,15 +215,23 @@ let simplemapper (init:int -> unit) (finalize: unit -> unit) ncores' compute opi
         "error at index j=%d in (%d,%d), chunksize=%d of a total of \
          %d got exception %s on core %d \n%!"
         j lo hi chunksize (hi-lo+1) (Printexc.to_string e) i;
+      marshal statusfdarr.(i) false;
       exit 1
     in
     let v = compute al lo hi opid exc_handler in
+    marshal statusfdarr.(i) true;
     marshal fdarr.(i) v);
   (* read in all data *)
   let res = ref [] in
+  let success = ref true in
+  (* check whether an exception has been raised in the subprocesses *)
+  for i = 0 to !ncores - 1 do
+    success:= !success && ((unmarshal statusfdarr.(i)):bool);
+  done;
+  if not !success then failwith "Aborting computation due to exception(s) raised in the workers";
   (* iterate in reverse order, to accumulate in the right order *)
   for i = 0 to !ncores - 1 do
-      res:= ((unmarshal fdarr.((!ncores-1)-i)):'d)::!res;
+    res:= ((unmarshal fdarr.((!ncores-1)-i)):'d)::!res;
   done;
   (* collect all results *)
   collect !res
