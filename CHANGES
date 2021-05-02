@@ -1,3 +1,6 @@
+2021/05/02 (RDC)
+        Update dune related files (thanks to Gabriel Radanne).
+        Fixed file descriptor leakage (read pipe end not closed in mapper), reported by Julia Lawall.
 
 2021/04/24 (RDC)
         Include fix in bytearray.ml to avoid corruption on 32bit architectures
