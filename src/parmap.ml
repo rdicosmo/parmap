@@ -718,11 +718,11 @@ let array_float_parmapi
       array: the data in Bigarray is placed at offset 1 w.r.t. a normal array,
       so we get a pointer to that zone into arr_out_as_array, and have it typed
       as a float array *)
-   let barr_out_as_array = Array.unsafe_get (Obj.magic barr_out) 1 in
+   (*let barr_out_as_array = Array.unsafe_get (Obj.magic barr_out) 1 in*)
    let compute _ lo hi _ exc_handler =
      try
        for i=lo to hi do
-         Array.unsafe_set barr_out_as_array i (f i (Array.unsafe_get al i))
+         Bigarray.Array1.unsafe_set barr_out i (f i (Array.unsafe_get al i))
        done
      with e -> exc_handler e lo
    in
