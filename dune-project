@@ -26,4 +26,6 @@
   base-bigarray
   base-unix
   (ocaml
-   (>= 4.03.0))))
+  (>= 4.03.0)))
+ (conflicts
+  ocaml-option-no-flat-float-array))
