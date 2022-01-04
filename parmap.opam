@@ -23,7 +23,6 @@ depends: [
   "odoc" {with-doc}
 ]
 conflicts: ["ocaml-option-no-flat-float-array"]
-dev-repo: "git+https://github.com/rdicosmo/parmap.git"
 build: [
   ["dune" "subst"] {dev}
   [
@@ -34,7 +33,8 @@ build: [
     "-j"
     jobs
     "@install"
-    "@runtest" {with-test & arch != "arm32" & arch != "x86_32"} 
+    "@runtest" {with-test}
     "@doc" {with-doc}
   ]
 ]
+dev-repo: "git+https://github.com/rdicosmo/parmap.git"
