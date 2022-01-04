@@ -5,10 +5,17 @@
   (:standard -w -35-27))
  (libraries parmap))
 
+(test
+ (name floatscale)
+ (modules floatscale)
+ (enabled_if %{arch_sixtyfour})
+ (flags (:standard -w -35-27))
+ (libraries utils parmap))
+
 (tests
- (names testexceptions floatscale simplescale simplescale_array simplescalefold
+ (names testexceptions simplescale simplescale_array simplescalefold
    simplescalemapfold)
- (modules testexceptions floatscale simplescale simplescale_array simplescalefold
+ (modules testexceptions simplescale simplescale_array simplescalefold
    simplescalemapfold)
  (flags
   (:standard -w -35-27))
