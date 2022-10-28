@@ -102,7 +102,8 @@ let reopen_out outchan path fname =
 
 (* send stdout and stderr to a file to avoid mixing output from different
    cores, if enabled *)
-let redirect ?(path = (Printf.sprintf "/tmp/.parmap.%d" (Unix.getpid ()))) ~id =
+let[@warning "-16" (*unerasable-optional-argument*)]
+  redirect ?(path = (Printf.sprintf "/tmp/.parmap.%d" (Unix.getpid ()))) ~id =
       reopen_out stdout path (Printf.sprintf "stdout.%d" id);
       reopen_out stderr path (Printf.sprintf "stderr.%d" id);;
 
