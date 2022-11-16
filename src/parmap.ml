@@ -80,7 +80,7 @@ let can_redirect path =
   else true
 
 let log_debug fmt =
-  Printf.kprintf (
+  Printf.ksprintf (
     if !debug_enabled then begin
       (fun s -> Format.eprintf "[Parmap]: %s@." s)
     end else ignore
