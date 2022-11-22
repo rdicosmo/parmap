@@ -204,7 +204,7 @@ and track_rect x y oldimg =
       (match oldimg with 
 	None -> ()
       | Some (i,x,y) -> draw_image i x y);
-      if w>0 & h>0 then 
+      if w>0 && h>0 then
 	let i = get_image bx by w h in
 	(* draw the border _inside_ the area *)
 	draw_rect bx by (w-1) (h-1);
