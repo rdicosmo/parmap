@@ -7,7 +7,7 @@
     "dateModified": "2022-01-03",
     "issueTracker": "https://github.com/rdicosmo/parmap/issues",
     "name": "Parmap",
-    "version": "1.2.4",
+    "version": "1.2.5",
     "applicationCategory": "Parallel computing",
     "developmentStatus": "active",
     "referencePublication": "https://doi.org/10.1016/j.procs.2012.04.202",
