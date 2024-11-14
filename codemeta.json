@@ -24,7 +24,7 @@
     "author": [
         {
             "@type": "Person",
-            "@id": "https://orcid.org/ 0000-0002-7493-5349",
+            "@id": "https://orcid.org/0000-0002-7493-5349",
             "givenName": "Roberto",
             "familyName": "Di Cosmo",
             "email": "roberto@dicosmo.org",
@@ -35,7 +35,7 @@
         },
         {
             "@type": "Person",
-            "@id": "https://orcid.org/ 0000-0002-7433-376X",
+            "@id": "https://orcid.org/0000-0002-7433-376X",
             "givenName": "Marco",
             "familyName": "Danelutto",
             "email": "marco.danelutto@unipi.it",
