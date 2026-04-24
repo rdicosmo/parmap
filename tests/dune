@@ -14,9 +14,9 @@
 
 (tests
  (names testexceptions simplescale simplescale_array simplescalefold
-   simplescalemapfold)
+   simplescalemapfold testncores1)
  (modules testexceptions simplescale simplescale_array simplescalefold
-   simplescalemapfold)
+   simplescalemapfold testncores1)
  (flags
   (:standard -w -35-27))
  (libraries utils parmap))
