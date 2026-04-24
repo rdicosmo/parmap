@@ -301,6 +301,16 @@ let setup_children_chans oc pipedown ?fdarr i =
 let mapper (init:int -> unit) (finalize:unit -> unit) ncores' ~chunksize compute opid al collect =
   let ln = Array.length al in
   if ln=0 then (collect []) else
+  if ncores' <= 1 then begin
+    (* Single-core: run in-process, no fork (issue #77).
+       init/finalize are intentionally skipped: with no child process there
+       is nothing to initialise. *)
+    ignore init; ignore finalize;
+    set_ncores 1;
+    log_debug "mapper on %d elements, single-core in-process (no fork)%!" ln;
+    let exc_handler e _ = raise e in
+    collect [compute al 0 (ln-1) opid exc_handler]
+  end else
   begin
    set_ncores (min ln (max 1 ncores'));
    log_debug "mapper on %d elements, on %d cores%!" ln !ncores;
@@ -410,6 +420,14 @@ let mapper (init:int -> unit) (finalize:unit -> unit) ncores' ~chunksize compute
 let geniter init finalize ncores' ~chunksize compute al =
   let ln = Array.length al in
   if ln=0 then () else
+  if ncores' <= 1 then begin
+    (* Single-core: run in-process, no fork (issue #77). *)
+    ignore init; ignore finalize;
+    set_ncores 1;
+    log_debug "geniter on %d elements, single-core in-process (no fork)%!" ln;
+    let exc_handler e _ = raise e in
+    compute al 0 (ln-1) exc_handler
+  end else
   begin
    set_ncores (min ln (max 1 ncores'));
    log_debug "geniter on %d elements, on %d cores%!" ln !ncores;
