@@ -43,7 +43,7 @@ CAMLprim value setcore(value which) {
   int finished=0;
   if (numcores <= 1) // only one core in the system, no need to attempt pinning
     return Val_unit;
-  while (finished==0)
+  do
     {
 #if HAVE_DECL_SCHED_SETAFFINITY
       CPU_ZERO(&cpus); 
@@ -72,5 +72,6 @@ CAMLprim value setcore(value which) {
 	  finished=1;
 	}
     }
+  while (finished==0 && w>0);
   return Val_unit;
 }
